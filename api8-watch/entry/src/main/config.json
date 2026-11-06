@@ -1,0 +1,89 @@
+{
+  "app": {
+    "bundleName": "com.aiwatch.watch",
+    "vendor": "aiwatch",
+    "version": {
+      "code": 2,
+      "name": "1.1.0"
+    },
+    "apiVersion": {
+      "compatible": 8,
+      "target": 8
+    }
+  },
+  "deviceConfig": {
+    "default": {
+      "network": {
+        "cleartextTraffic": true
+      }
+    }
+  },
+  "module": {
+    "package": "com.aiwatch.watch",
+    "name": ".entry",
+    "mainAbility": ".HiWearMainAbility",
+    "deviceType": [
+      "wearable"
+    ],
+    "colorMode": "dark",
+    "distro": {
+      "moduleType": "entry",
+      "installationFree": false,
+      "deliveryWithInstall": true,
+      "moduleName": "entry"
+    },
+    "reqPermissions": [
+      {
+        "name": "ohos.permission.INTERNET"
+      },
+      {
+        "name": "ohos.permission.MICROPHONE",
+        "reason": "$string:microphone_reason",
+        "usedScene": {
+          "ability": [
+            "com.aiwatch.watch.HiWearMainAbility"
+          ],
+          "when": "inuse"
+        }
+      }
+    ],
+    "abilities": [
+      {
+        "name": ".HiWearMainAbility",
+        "srcLanguage": "js",
+        "srcPath": "HiWearMainAbility",
+        "icon": "$media:icon",
+        "description": "$string:MainAbility_desc",
+        "label": "$string:MainAbility_label",
+        "type": "page",
+        "formsEnabled": false,
+        "launchType": "standard",
+        "orientation": "unspecified",
+        "visible": true,
+        "skills": [
+          {
+            "actions": [
+              "action.system.home"
+            ],
+            "entities": [
+              "entity.system.home"
+            ]
+          }
+        ]
+      }
+    ],
+    "js": [
+      {
+        "pages": [
+          "pages/index/index"
+        ],
+        "name": ".HiWearMainAbility",
+        "window": {
+          "designWidth": 466,
+          "autoDesignWidth": false
+        }
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "AI-watch wearable entry module.",
+  "main": "",
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {}
+}

@@ -1,0 +1,26 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.nova.watchai"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.nova.watchai"
+        minSdk 31
+        targetSdk 31
+        versionCode 3
+        versionName "2.1-verification"
+    }
+
+    buildTypes {
+        debug { debuggable true }
+        release { minifyEnabled false }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

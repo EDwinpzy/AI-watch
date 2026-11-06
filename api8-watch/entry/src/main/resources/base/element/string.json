@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "MainAbility_desc",
+      "value": "NOVA Watch AI 原生穿戴应用"
+    },
+    {
+      "name": "MainAbility_label",
+      "value": "NOVA Watch AI"
+    },
+    {
+      "name": "microphone_reason",
+      "value": "用于手表语音对话时采集你说的话。"
+    }
+  ]
+}

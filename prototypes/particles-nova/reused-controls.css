@@ -1,0 +1,25 @@
+/* Size/theme adapter only. Materials, refraction, press spring and selection spring
+   come from the two locally vendored MIT libraries. */
+#screen button.glass{
+  --glass-radius:36px;--glass-opacity-dark:.32;--glass-shadow-strength:.4;
+  background:transparent;box-shadow:var(--_lg-shadow);border:0;
+  color:var(--_lg-label);text-shadow:none;overflow:visible;
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+#screen button.glass::before,#screen button.glass::after{all:revert-layer;content:""!important;display:block!important}
+#screen button.glass:active{filter:none;box-shadow:var(--_lg-shadow)}
+#screen .record-main.glass,#screen .record-done.glass{width:138px;height:68px;border-radius:36px}
+#screen .is-idle .record-main.glass{width:260px}
+#screen .round.glass{--glass-radius:50%;border-radius:50%}
+#screen .round.end.glass{--glass-tint:#a52c48}
+#screen lg-segmented.result-tabs{
+  --lg-track:#191c24;--lg-surface:#526a88;--lg-text-muted:#a5afbd;--lg-accent:#f5f8ff;
+  --lg-radius:32px;--lg-radius-sm:27px;--lg-shadow-1:0 2px 8px #0006;
+  width:280px;height:60px;min-height:60px;padding:5px;gap:4px;
+  border:1px solid #ffffff12;background:#191c24;overflow:visible;box-shadow:inset 0 1px 0 #ffffff0c;
+}
+#screen lg-segmented.result-tabs .lg-seg__option{flex:1;height:48px;min-height:48px;line-height:48px;font-size:21px;padding:0;border:0;box-shadow:none;background:transparent;transition:none}
+#screen lg-segmented.result-tabs .lg-seg__option[aria-checked=true]{color:#fff}
+#screen lg-segmented.result-tabs .lg-refract{padding:5px;gap:4px}
+#screen lg-segmented.result-tabs .lg-refract .lg-seg__option{color:#fff}
+#screen lg-segmented.result-tabs .lg-lens-shadow{border:1px solid #e2f0ff25}

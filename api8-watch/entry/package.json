@@ -1,0 +1,14 @@
+{
+  "license": "UNLICENSED",
+  "devDependencies": {},
+  "name": "entry",
+  "ohos": {
+    "org": "aiwatch",
+    "directoryLevel": "module",
+    "buildTool": "hvigor"
+  },
+  "description": "NOVA Watch AI FA entry module.",
+  "repository": {},
+  "version": "1.0.0",
+  "dependencies": {}
+}

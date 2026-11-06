@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-labelledby="title">
+<title id="title">录音控制按钮</title><defs>
+<radialGradient id="red" cx="28%" cy="18%" r="86%"><stop stop-color="#FF9BA8"/><stop offset=".38" stop-color="#FF526E"/><stop offset=".72" stop-color="#F72D50"/><stop offset="1" stop-color="#A90C2D"/></radialGradient>
+<filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter></defs>
+<circle cx="90" cy="90" r="72" fill="#FF345B" opacity=".18" filter="url(#glow)"/>
+<circle cx="90" cy="90" r="58" fill="url(#red)" stroke="#FFD8DE" stroke-width="2.5"/>
+<circle cx="90" cy="90" r="67" fill="none" stroke="#FF7B90" stroke-opacity=".24" stroke-width="2"/>
+<rect x="75" y="75" width="30" height="30" rx="6" fill="#FFF"/>
+<path d="M53 54a51 51 0 0 1 49-17" fill="none" stroke="#FFF" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/>
+</svg>

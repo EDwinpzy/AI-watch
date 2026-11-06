@@ -1,0 +1,36 @@
+/* Glass controls: transparent tinted body, specular rim and tactile press. */
+.screen .record-main,.screen .record-done,.screen .round,.screen .primary,.screen .secondary,.screen .wrist-row,.screen .record-done{
+ isolation:isolate;overflow:hidden;backdrop-filter:blur(16px) saturate(145%);-webkit-backdrop-filter:blur(16px) saturate(145%);
+ border:1px solid #ffffff38;background:linear-gradient(145deg,#ffffff20 0%,#ffffff0a 42%,#ffffff04 60%,#b5d6ff12 100%);
+ box-shadow:inset 0 1px 1px #ffffff38,inset 0 -1px 1px #b9dcff14,0 6px 16px #0006,0 0 0 1px #0005;
+ transition:transform .22s cubic-bezier(.2,.9,.25,1.4),box-shadow .22s,filter .22s;
+}
+.screen .record-main:before,.screen .record-done:before,.screen .round:before,.screen .primary:before,.screen .secondary:before,.screen .wrist-row:before{
+ content:'';position:absolute;inset:0;pointer-events:none;z-index:-1;border-radius:inherit;
+ background:radial-gradient(ellipse at 22% 8%,#ffffff3b,transparent 55%),linear-gradient(125deg,transparent 32%,#ffffff0b 44%,transparent 56%);
+}
+.screen .record-main:after,.screen .record-done:after,.screen .round:after{
+ content:'';position:absolute;left:18%;right:18%;top:6%;height:23%;border-radius:50%;background:linear-gradient(#ffffff30,#ffffff00);filter:blur(1px);pointer-events:none;
+}
+.screen .record-main{background:radial-gradient(circle at 40% 10%,#95c6ff33,transparent 65%),linear-gradient(150deg,#5a96e43d,#2b426d35 55%,#12254270);color:#eaf4ff;border-color:#c0ddff60;box-shadow:inset 0 1px 2px #ffffff55,inset 0 -3px 8px #82b8ff16,0 7px 18px #0008,0 0 20px #5898ec12}
+.screen .record-done{background:radial-gradient(circle at 30% 12%,#ffffff45,transparent 60%),linear-gradient(145deg,#c4e6ff45,#8fb5df24 55%,#5680b62b);color:#f2f8ff;border-color:#e5f4ff88;box-shadow:inset 0 1px 2px #ffffff80,inset 0 -3px 10px #c3e4ff18,0 7px 18px #0008,0 0 22px #b6d9ff10}
+.screen .record-main,.screen .record-done{width:76px;height:76px}.record-button-labels span{width:76px}.record-buttons,.record-button-labels{gap:34px}.record-main .pause-symbol{border-color:#e6f2ff;filter:drop-shadow(0 1px 3px #a2d0ff55)}.record-done>span{font-size:30px;filter:drop-shadow(0 1px 3px #d9edff55)}
+.screen .primary,.screen .blue-row{background:linear-gradient(150deg,#65aaff66,#327de946 48%,#1b4e994a);border-color:#a9d3ff66;color:#f5f9ff;text-shadow:0 1px 4px #001c46aa}
+.screen .round.end{background:linear-gradient(145deg,#ff97a653,#ad2a453d);border-color:#ffa5b66b;color:#ffe6ec}
+.screen .wrist-row:not(.blue-row){background:linear-gradient(145deg,#a7bed522,#6c7e9410 50%,#a6bfd512);border-color:#ffffff22}
+.screen .record-main:active,.screen .record-done:active,.screen .round:active,.screen .primary:active,.screen .secondary:active,.screen .wrist-row:active{
+ transform:scale(.93);filter:brightness(1.15);box-shadow:inset 0 2px 8px #0005,inset 0 1px 1px #ffffff55,0 2px 6px #0005;
+}
+.screen .result-tabs{background:linear-gradient(150deg,#d0e2ff17,#8da2bf09);border:1px solid #ffffff20;backdrop-filter:blur(12px)}.screen .result-tabs button[aria-selected=true]{background:linear-gradient(145deg,#9ccfff40,#79a2d320);box-shadow:inset 0 1px 0 #ffffff44,0 3px 8px #0004;border:1px solid #cce4ff33}
+@media(prefers-reduced-motion:reduce){.screen button{transition:none!important}}
+/* watchOS HIG-informed control hierarchy, independently implemented for round Huawei preview. */
+.screen .record-main,.screen .record-done{width:138px;height:68px;min-height:68px;border-radius:36px;display:flex;align-items:center;justify-content:center;gap:11px;border:1px solid #ffffff20;background:linear-gradient(180deg,#ffffff17,#ffffff0b);box-shadow:inset 0 1px 0 #ffffff16,0 3px 12px #0003;backdrop-filter:blur(12px);color:#f3f4f6}
+.screen .record-main:after,.screen .record-done:after,.screen .round:after{display:none}.screen .record-main:before,.screen .record-done:before{background:linear-gradient(130deg,#ffffff0b,transparent 60%)}
+.screen .record-done{background:linear-gradient(180deg,#57a8ef3d,#3a83c62a);border-color:#9acbf638;color:#9cd1ff}.screen .is-idle .record-main{width:260px;background:linear-gradient(180deg,#4b9be635,#3278bd25);border-color:#8ebce631;color:#a5d5ff}
+.record-main:after{content:none!important}.record-main .mic-symbol{font-size:20px}.record-main .pause-symbol{height:19px;width:15px;border-width:5px}.record-done>span{font-size:24px;filter:none!important}
+.record-buttons{gap:12px}.record-button-labels{display:none}.record-demo-label{margin-top:22px}.record-control-name{font-size:21px;font-weight:500;letter-spacing:.3px}.record-main .record-control-name,.record-done .record-control-name{filter:none;font-size:21px}
+.screen .primary,.screen .secondary,.screen .wrist-row{border-radius:40px;box-shadow:inset 0 1px 0 #ffffff0e,0 2px 6px #0002;border-color:#ffffff12;background:linear-gradient(180deg,#ffffff15,#ffffff0c)}
+.screen .primary,.screen .blue-row{background:linear-gradient(180deg,#428acb3a,#316da52a);color:#9fd4ff;border-color:#6bafe72b;text-shadow:none}
+.screen .primary:before,.screen .secondary:before,.screen .wrist-row:before{background:none}
+.screen .round{background:linear-gradient(180deg,#ffffff1b,#ffffff0a);border-color:#ffffff25;box-shadow:inset 0 1px 0 #ffffff12,0 3px 8px #0003}.screen .round.end{background:linear-gradient(180deg,#ff69832b,#e5405a1d);color:#ff8da2;border-color:#ff94a52b}
+.screen .result-tabs{border:0;background:#ffffff0d;box-shadow:none}.screen .result-tabs button[aria-selected=true]{background:#ffffff1c;border:1px solid #ffffff15;box-shadow:0 2px 6px #0003;color:#fff}

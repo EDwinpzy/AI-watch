@@ -1,0 +1,28 @@
+/* Huawei wearable resource alignment: visual reference, not exported Pixso instances. */
+.screen{background:#000;color:#fff;font-family:"HarmonyOS Sans","Microsoft YaHei",sans-serif}
+.screen .status{color:#ddd}
+.screen .kicker,.screen .sub,.screen .notice{color:#999}
+.screen .card{background:#171717;border:0;border-radius:24px}
+.screen .card.clickable{min-height:64px;background:#000;border-radius:0;border-bottom:1px solid #282828;padding:15px 8px}
+.screen .card small,.screen .card p{color:#aaa}
+.screen .card h4{color:#fff;font-size:18px}
+.screen .setting-row{font-size:18px;min-height:66px}
+.screen .setting-row span{color:#999;font-size:13px}
+.screen .primary{background:#0a59f7;color:#fff;border-radius:32px;min-height:44px;padding:12px 22px;font-size:16px}
+.screen .secondary,.screen .chip{background:#262626;color:#fff;border:0;border-radius:30px;min-height:44px;font-size:14px}
+.screen .back{background:transparent;color:#fff;border:0;font-size:28px}
+.screen .page-head{justify-content:center;position:relative;margin-bottom:18px}
+.screen .page-head .back{position:absolute;left:0}
+.screen .page-head h3{font-size:22px;max-width:250px}
+.screen .round{background:#262626;border:0;color:#fff;width:48px;height:48px}
+.screen .round.end{background:#e8404a;color:#fff}
+.screen .bubble{background:#202020;color:#fff;font-size:15px}
+.screen .bubble.user{background:#153c7c}
+.screen .inputrow input,.screen .field input,.screen .field textarea{background:#202020;border:0;color:#fff;border-radius:24px}
+.screen .inputrow button{background:#0a59f7;color:#fff}
+.screen .field{color:#aaa;font-size:13px}
+.screen .timer,.screen .summary-number,.screen .mini-link{color:#5b9dff}
+.screen .wave i{background:#5b9dff}
+.screen .page:after{content:'';position:absolute;right:13px;top:190px;width:3px;height:66px;background:#666;border-radius:3px}
+.screen .home:after{content:'●  ·  ·';position:absolute;bottom:22px;left:0;right:0;color:#777;font-size:10px;letter-spacing:5px}
+#toast{background:#333;color:#fff;bottom:100px}

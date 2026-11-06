@@ -1,0 +1,49 @@
+{
+  "app": {
+    "bundleName": "com.aiwatch.watch",
+    "vendor": "NOVA",
+    "version": {
+      "code": 1,
+      "name": "1.0.0"
+    },
+    "apiVersion": {
+      "compatible": 5,
+      "target": 8
+    }
+  },
+  "deviceConfig": {},
+  "module": {
+    "package": "com.aiwatch.watch",
+    "name": "com.aiwatch.watch.NovaApplication",
+    "mainAbility": ".MainAbility",
+    "deviceType": [
+      "wearable"
+    ],
+    "distro": {
+      "deliveryWithInstall": true,
+      "moduleName": "entry",
+      "moduleType": "entry"
+    },
+    "abilities": [
+      {
+        "name": ".MainAbility",
+        "description": "NOVA native Java FA installation probe",
+        "label": "NOVA Probe",
+        "type": "page",
+        "visible": true,
+        "launchType": "singleton",
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "action.system.home"
+            ]
+          }
+        ]
+      }
+    ],
+    "reqPermissions": []
+  }
+}

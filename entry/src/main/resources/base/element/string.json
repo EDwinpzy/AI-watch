@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "NOVA Watch AI 语音与效率原型"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "NOVA Watch AI 主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NOVA Watch AI"
+    }
+  ]
+}

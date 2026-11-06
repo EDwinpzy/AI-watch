@@ -1,0 +1,17 @@
+{
+  "name": "ai-watch",
+  "version": "0.1.0",
+  "ohos": {
+    "org": "aiwatch",
+    "buildTool": "hvigor",
+    "directoryLevel": "project"
+  },
+  "description": "AI-watch native HarmonyOS wearable app.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "check:core": "node scripts/test-watch-core.mjs",
+    "check:source": "node scripts/verify-source.mjs",
+    "check:api8": "node scripts/test-api8-threads.mjs"
+  },
+  "dependencies": {}
+}

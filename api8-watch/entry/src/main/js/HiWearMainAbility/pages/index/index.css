@@ -1,0 +1,1301 @@
+.app {
+  width: 100%;
+  height: 100%;
+  background-color: #03050a;
+  color: #f5f8ff;
+  overflow: hidden;
+}
+
+.clock {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  width: 100%;
+  height: 28px;
+  font-size: 23px;
+  font-weight: 500;
+  text-align: center;
+  color: #f6f8fc;
+  z-index: 80;
+}
+
+.status-glyph {
+  position: absolute;
+  top: 22px;
+  right: 126px;
+  width: 70px;
+  height: 16px;
+  font-size: 10px;
+  color: #9aa4b2;
+  text-align: right;
+  z-index: 80;
+}
+
+.main-swiper,
+.page,
+.subpage {
+  width: 100%;
+  height: 100%;
+  background-color: #03050a;
+}
+
+.page {
+  padding: 66px 72px 52px 72px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.kicker,
+.voice-kicker {
+  width: 100%;
+  height: 22px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #8aa6c9;
+}
+
+.home-page {
+  justify-content: center;
+  padding-bottom: 48px;
+}
+
+.orb-button {
+  width: 190px;
+  height: 190px;
+  margin-top: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.particle-orb {
+  width: 160px;
+  height: 160px;
+  border-radius: 80px;
+  position: relative;
+  overflow: visible;
+  background-color: #123363;
+  animation: orb-breathe 4.6s ease-in-out infinite;
+}
+
+.orb-halo {
+  position: absolute;
+  left: -12px;
+  top: -12px;
+  width: 184px;
+  height: 184px;
+  border-radius: 92px;
+  background: linear-gradient(145deg, rgba(103, 81, 219, 0.28), rgba(49, 117, 235, 0.08) 55%, rgba(0, 0, 0, 0) 100%);
+  opacity: 0.88;
+}
+
+.orb-core {
+  position: absolute;
+  left: 13px;
+  top: 13px;
+  width: 134px;
+  height: 134px;
+  border-radius: 67px;
+  background: linear-gradient(145deg, #b9d8ff 0%, #72a8f2 22%, #455dcc 53%, #261f79 76%, #171353 100%);
+}
+
+.orb-rim {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 152px;
+  height: 152px;
+  border-radius: 76px;
+  border: 1px solid rgba(191, 220, 255, 0.22);
+}
+
+.orb-glint {
+  position: absolute;
+  left: 34px;
+  top: 22px;
+  width: 58px;
+  height: 25px;
+  border-radius: 29px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
+  transform: rotate(-17deg);
+  opacity: 0.72;
+}
+
+.orb-dots {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background-color: #cae5ff;
+  opacity: 0.72;
+}
+
+.dot-a {
+  left: 31px;
+  top: 98px;
+}
+
+.dot-b {
+  left: 69px;
+  top: 38px;
+}
+
+.dot-c {
+  left: 92px;
+  top: 114px;
+}
+
+.home-title {
+  width: 100%;
+  height: 33px;
+  margin-top: 13px;
+  text-align: center;
+  font-size: 25px;
+  font-weight: 600;
+  color: #f4f7fc;
+}
+
+.gesture-hint,
+.page-dots {
+  width: 100%;
+  height: 21px;
+  margin-top: 9px;
+  text-align: center;
+  font-size: 13px;
+  color: #7d8797;
+}
+
+.page-dots {
+  margin-top: 34px;
+  color: #89a9d4;
+  letter-spacing: 2px;
+}
+
+@keyframes orb-breathe {
+  0%, 100% {
+    transform: scale(0.98);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+}
+
+.record-page {
+  justify-content: flex-start;
+  padding-top: 78px;
+}
+
+.record-studio {
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+}
+
+.record-topline {
+  width: 100%;
+  height: 25px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #9aa7b8;
+}
+
+.record-light {
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 4px;
+  background-color: #667282;
+}
+
+.is-recording .record-light {
+  background-color: #ff4d6d;
+  animation: record-light 1.15s ease-in-out infinite;
+}
+
+.is-paused .record-light {
+  background-color: #ffc762;
+}
+
+@keyframes record-light {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.record-clock {
+  width: 100%;
+  height: 54px;
+  margin-top: 3px;
+  text-align: center;
+  font-size: 43px;
+  font-weight: 300;
+  color: #f4f7fb;
+}
+
+.record-wave {
+  width: 290px;
+  height: 98px;
+  margin-top: 3px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.wave-seg {
+  width: 8px;
+  margin: 0 4px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(171, 239, 255, 0.95), rgba(70, 123, 255, 0.88) 45%, rgba(129, 69, 235, 0.78));
+  opacity: 0.48;
+}
+
+.is-recording .wave-seg {
+  opacity: 1;
+  animation: record-wave 1.05s ease-in-out infinite alternate;
+}
+
+.wave-1 { height: 22px; animation-delay: 0.04s; }
+.wave-2 { height: 41px; animation-delay: 0.15s; }
+.wave-3 { height: 66px; animation-delay: 0.26s; }
+.wave-4 { height: 49px; animation-delay: 0.09s; }
+.wave-5 { height: 81px; animation-delay: 0.31s; }
+.wave-6 { height: 58px; animation-delay: 0.19s; }
+.wave-7 { height: 73px; animation-delay: 0.38s; }
+.wave-8 { height: 38px; animation-delay: 0.12s; }
+.wave-9 { height: 26px; animation-delay: 0.28s; }
+
+.wave-axis {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  top: 49px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(94, 165, 255, 0), rgba(94, 165, 255, 0.42), rgba(94, 165, 255, 0));
+}
+
+@keyframes record-wave {
+  from { transform: scaleY(0.45); }
+  to { transform: scaleY(1.08); }
+}
+
+.record-caption {
+  width: 100%;
+  height: 28px;
+  text-align: center;
+  font-size: 16px;
+  color: #a5afbd;
+}
+
+.record-actions {
+  width: 100%;
+  min-height: 70px;
+  margin-top: 15px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.glass-pill {
+  height: 58px;
+  min-width: 128px;
+  padding: 0 20px;
+  border-radius: 30px;
+  border: 1px solid rgba(213, 231, 255, 0.13);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  color: #d7e6f8;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.glass-pill:active {
+  transform: scale(0.94);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.19), rgba(255, 255, 255, 0.08));
+}
+
+.record-main-button {
+  min-width: 172px;
+  color: #b8dcff;
+  border-color: rgba(132, 190, 255, 0.24);
+  background: linear-gradient(180deg, rgba(70, 145, 226, 0.28), rgba(42, 95, 164, 0.2));
+}
+
+.record-done-button {
+  min-width: 112px;
+  margin-left: 11px;
+  color: #a8ddff;
+  border-color: rgba(139, 207, 255, 0.28);
+  background: linear-gradient(180deg, rgba(75, 167, 235, 0.29), rgba(44, 105, 172, 0.21));
+}
+
+.record-note {
+  width: 100%;
+  height: 24px;
+  margin-top: 13px;
+  text-align: center;
+  font-size: 12px;
+  color: #697687;
+}
+
+.list-item {
+  width: 322px;
+}
+
+.wrist-list,
+.result-scroll,
+.chat-scroll {
+  width: 100%;
+  height: 100%;
+  padding: 72px 67px 62px 67px;
+  background-color: #03050a;
+}
+
+.list-title,
+.result-title,
+.conversation-title {
+  width: 100%;
+  height: 42px;
+  margin-bottom: 13px;
+  text-align: center;
+  font-size: 25px;
+  font-weight: 500;
+  color: #f5f7fb;
+}
+
+.glass-row {
+  width: 100%;
+  min-height: 74px;
+  padding: 13px 17px;
+  margin-bottom: 11px;
+  border-radius: 37px;
+  border: 1px solid rgba(203, 223, 249, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.035));
+  flex-direction: row;
+  align-items: center;
+}
+
+.glass-row:active {
+  transform: scale(0.96);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+}
+
+.new-chat-row {
+  justify-content: center;
+}
+
+.row-icon {
+  width: 38px;
+  font-size: 28px;
+  color: #9dc7f8;
+  text-align: center;
+}
+
+.row-label {
+  flex: 1;
+  min-height: 25px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #eef4fb;
+}
+
+.row-copy {
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.row-subtitle {
+  width: 100%;
+  height: 22px;
+  font-size: 12px;
+  color: #8793a5;
+}
+
+.row-chevron {
+  width: 23px;
+  font-size: 30px;
+  text-align: center;
+  color: #65758a;
+}
+
+.thread-mark {
+  width: 42px;
+  height: 42px;
+  margin-right: 12px;
+  border-radius: 21px;
+  text-align: center;
+  line-height: 42px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.blue-mark { background-color: #2f78d5; }
+.green-mark { background-color: #258d7b; }
+.purple-mark { background-color: #7053cf; }
+
+.switch-track {
+  width: 55px;
+  height: 31px;
+  padding: 3px;
+  border-radius: 16px;
+  background-color: #29303b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-direction: row;
+  align-items: center;
+}
+
+.switch-knob {
+  width: 23px;
+  height: 23px;
+  border-radius: 12px;
+  background-color: #8a96a6;
+}
+
+.switch-on {
+  background-color: #2e6eb8;
+}
+
+.switch-on .switch-knob {
+  margin-left: 22px;
+  background-color: #e8f4ff;
+}
+
+.wrist-note,
+.subpage-hint {
+  width: 100%;
+  height: 38px;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 18px;
+  color: #6f7b8d;
+}
+
+.subpage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  padding: 60px 68px 32px 68px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.voice-page {
+  padding-top: 59px;
+}
+
+.voice-orb-wrap {
+  width: 174px;
+  height: 174px;
+  margin-top: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.voice-orb {
+  width: 116px;
+  height: 116px;
+  border-radius: 58px;
+}
+
+.voice-orb .orb-halo {
+  left: -16px;
+  top: -16px;
+  width: 148px;
+  height: 148px;
+  border-radius: 74px;
+}
+
+.voice-orb .orb-core {
+  left: 10px;
+  top: 10px;
+  width: 96px;
+  height: 96px;
+  border-radius: 48px;
+}
+
+.voice-orb .orb-rim {
+  left: 3px;
+  top: 3px;
+  width: 110px;
+  height: 110px;
+  border-radius: 55px;
+}
+
+.voice-orb .orb-glint {
+  left: 25px;
+  top: 17px;
+  width: 42px;
+  height: 18px;
+  border-radius: 21px;
+}
+
+.pulse-ring {
+  position: absolute;
+  width: 132px;
+  height: 132px;
+  border-radius: 66px;
+  border: 2px solid rgba(102, 171, 255, 0.32);
+  animation: pulse-ring 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  from { opacity: 0.25; transform: scale(0.88); }
+  to { opacity: 0.82; transform: scale(1.18); }
+}
+
+.voice-title {
+  width: 100%;
+  height: 33px;
+  margin-top: 2px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  color: #f4f7fc;
+}
+
+.voice-caption {
+  width: 100%;
+  height: 22px;
+  text-align: center;
+  font-size: 13px;
+  color: #8b97a8;
+}
+
+.voice-response-card {
+  width: 300px;
+  max-height: 72px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(177, 206, 239, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+}
+
+.voice-response-text {
+  width: 100%;
+  font-size: 14px;
+  line-height: 19px;
+  color: #dce8f6;
+  text-align: center;
+}
+
+.self-test-button {
+  width: 168px;
+  min-height: 44px;
+  height: 44px;
+  margin-top: 11px;
+  border-radius: 23px;
+  font-size: 14px;
+}
+
+.voice-controls {
+  width: 100%;
+  height: 69px;
+  margin-top: 10px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.round-control {
+  width: 58px;
+  height: 58px;
+  margin: 0 23px;
+  border-radius: 29px;
+  border: 1px solid rgba(214, 231, 255, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.035));
+  color: #dfeaf7;
+  font-size: 23px;
+}
+
+.round-control:active {
+  transform: scale(0.92);
+}
+
+.round-end {
+  color: #ff8da2;
+  border-color: rgba(255, 141, 162, 0.2);
+  background: linear-gradient(180deg, rgba(255, 105, 131, 0.24), rgba(229, 64, 90, 0.13));
+}
+
+.control-labels {
+  width: 306px;
+  height: 20px;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 0 26px;
+  font-size: 11px;
+  color: #697687;
+}
+
+.segmented-control {
+  width: 280px;
+  height: 60px;
+  padding: 5px;
+  position: relative;
+  flex-direction: row;
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #171b23;
+}
+
+.segment-indicator {
+  position: absolute;
+  top: 5px;
+  width: 131px;
+  height: 48px;
+  border-radius: 27px;
+  border: 1px solid rgba(226, 240, 255, 0.16);
+  background: linear-gradient(180deg, rgba(101, 134, 174, 0.78), rgba(61, 84, 119, 0.72));
+}
+
+.segment-left { left: 5px; }
+.segment-right { left: 137px; }
+
+.segment-option {
+  width: 131px;
+  height: 48px;
+  margin-right: 4px;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #9da8b8;
+  z-index: 2;
+}
+
+.segment-option:last-child {
+  margin-right: 0;
+}
+
+.segment-selected {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.result-page {
+  padding-top: 55px;
+  padding-left: 58px;
+  padding-right: 58px;
+}
+
+.result-title {
+  margin-bottom: 9px;
+}
+
+.result-scroll {
+  padding: 12px 10px 38px 10px;
+}
+
+.result-intro {
+  width: 100%;
+  min-height: 64px;
+  margin-bottom: 12px;
+  padding: 13px 17px;
+  border-radius: 28px;
+  border: 1px solid rgba(196, 218, 246, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  flex-direction: row;
+  align-items: center;
+}
+
+.result-spark {
+  width: 38px;
+  font-size: 23px;
+  color: #b7d5ff;
+}
+
+.result-point {
+  width: 100%;
+  min-height: 78px;
+  padding: 14px 15px;
+  margin-bottom: 10px;
+  border-radius: 25px;
+  border: 1px solid rgba(196, 218, 246, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.summary-counter {
+  width: 38px;
+  height: 29px;
+  border-radius: 15px;
+  background-color: rgba(74, 122, 187, 0.26);
+  color: #99c4f5;
+  text-align: center;
+  line-height: 29px;
+  font-size: 12px;
+}
+
+.result-point-text {
+  flex: 1;
+  font-size: 16px;
+  line-height: 22px;
+  color: #e1e9f4;
+}
+
+.original-meta {
+  width: 100%;
+  height: 25px;
+  font-size: 12px;
+  color: #7d899a;
+}
+
+.original-text {
+  width: 100%;
+  min-height: 210px;
+  padding: 15px 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(196, 218, 246, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+  font-size: 16px;
+  line-height: 23px;
+  color: #e1e9f4;
+}
+
+.transcript-edit {
+  width: 100%;
+  height: 218px;
+  padding: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(102, 166, 238, 0.34);
+  background-color: #0b111a;
+  color: #eef5ff;
+  font-size: 16px;
+  line-height: 23px;
+}
+
+.result-actions {
+  width: 100%;
+  min-height: 62px;
+  margin-top: 3px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.secondary-action,
+.primary-action,
+.action-row {
+  min-width: 122px;
+  height: 52px;
+  margin: 0 5px;
+  padding: 0 15px;
+  font-size: 16px;
+}
+
+.primary-action {
+  color: #a9d8ff;
+  border-color: rgba(126, 190, 255, 0.25);
+  background: linear-gradient(180deg, rgba(65, 139, 208, 0.27), rgba(46, 91, 146, 0.18));
+}
+
+.action-row {
+  width: 232px;
+  margin: 6px auto;
+}
+
+.api-page {
+  padding: 0;
+}
+
+.api-page .wrist-list {
+  padding-top: 68px;
+}
+
+.service-state {
+  width: 202px;
+  height: 34px;
+  margin: 0 auto 13px auto;
+  border-radius: 17px;
+  background-color: #141b26;
+  color: #8d9aad;
+  font-size: 13px;
+  text-align: center;
+  line-height: 34px;
+}
+
+.service-ready {
+  background-color: rgba(38, 115, 91, 0.38);
+  color: #7fe0be;
+}
+
+.field-page {
+  padding-top: 84px;
+  align-items: center;
+}
+
+.field-step {
+  width: 100%;
+  height: 22px;
+  text-align: center;
+  font-size: 13px;
+  color: #7790ad;
+}
+
+.field-title {
+  width: 100%;
+  height: 42px;
+  margin-top: 7px;
+  text-align: center;
+  font-size: 27px;
+  font-weight: 600;
+  color: #f3f6fb;
+}
+
+.field-hint {
+  width: 100%;
+  height: 24px;
+  margin-bottom: 17px;
+  text-align: center;
+  font-size: 13px;
+  color: #8d99aa;
+}
+
+.field-input {
+  width: 318px;
+  height: 56px;
+  padding: 0 18px;
+  border-radius: 28px;
+  border: 1px solid rgba(126, 181, 239, 0.27);
+  background-color: #0b111a;
+  color: #eef5ff;
+  font-size: 17px;
+}
+
+.field-save {
+  width: 250px;
+  margin-top: 22px;
+}
+
+.conversation-page {
+  padding: 55px 58px 25px 58px;
+}
+
+.conversation-title {
+  height: 36px;
+  margin-bottom: 4px;
+}
+
+.chat-scroll {
+  padding: 7px 7px 9px 7px;
+}
+
+.chat-item {
+  width: 100%;
+}
+
+.message-row {
+  width: 100%;
+  min-height: 63px;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+  border-radius: 23px;
+  border: 1px solid rgba(191, 215, 244, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+  flex-direction: column;
+}
+
+.message-user {
+  background: linear-gradient(180deg, rgba(55, 119, 191, 0.29), rgba(39, 86, 139, 0.19));
+  border-color: rgba(130, 187, 247, 0.22);
+}
+
+.message-assistant {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025));
+}
+
+.message-author {
+  width: 100%;
+  height: 20px;
+  font-size: 11px;
+  color: #85a6cc;
+}
+
+.message-text {
+  width: 100%;
+  font-size: 15px;
+  line-height: 21px;
+  color: #e5edf7;
+}
+
+.chat-empty {
+  width: 100%;
+  height: 70px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 70px;
+  color: #778394;
+}
+
+.chat-actions {
+  width: 100%;
+  min-height: 119px;
+  padding-top: 2px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chat-action {
+  width: 260px;
+  height: 49px;
+  margin: 4px 0;
+  font-size: 16px;
+}
+
+.composer-row {
+  width: 292px;
+  height: 50px;
+  margin-top: 4px;
+  flex-direction: row;
+  align-items: center;
+}
+
+.composer-input {
+  flex: 1;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 23px;
+  border: 1px solid rgba(186, 209, 237, 0.15);
+  background-color: #0c121b;
+  color: #ecf3fc;
+  font-size: 15px;
+}
+
+.send-button {
+  width: 72px;
+  min-width: 72px;
+  height: 46px;
+  padding: 0;
+  margin-left: 6px;
+  font-size: 15px;
+}
+
+.toast {
+  position: absolute;
+  left: 83px;
+  bottom: 56px;
+  width: 300px;
+  min-height: 42px;
+  padding: 10px 15px;
+  border-radius: 23px;
+  background-color: rgba(21, 29, 42, 0.96);
+  border: 1px solid rgba(197, 220, 247, 0.13);
+  z-index: 120;
+}
+
+.toast-text {
+  width: 100%;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  color: #eaf2fb;
+}
+
+/* Native glass controls: API 8 containers preserve the gradient material that
+   system button widgets override. */
+.glass-pill {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill-label {
+  width: 100%;
+  text-align: center;
+  color: #dcecff;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.record-main-button .pill-label,
+.record-done-button .pill-label,
+.primary-action .pill-label {
+  color: #b9e0ff;
+}
+
+.round-control {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.round-symbol {
+  width: 100%;
+  text-align: center;
+  color: #edf5ff;
+  font-size: 23px;
+}
+
+.round-end .round-symbol {
+  color: #ff9aae;
+}
+
+.orb-particle {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background-color: #cde8ff;
+  opacity: 0.72;
+}
+
+.orb-p1 { left: 18%; top: 24%; }
+.orb-p2 { left: 29%; top: 10%; width: 4px; height: 4px; opacity: 0.84; }
+.orb-p3 { left: 43%; top: 16%; opacity: 0.58; }
+.orb-p4 { left: 61%; top: 9%; width: 4px; height: 4px; }
+.orb-p5 { left: 78%; top: 23%; opacity: 0.78; }
+.orb-p6 { left: 87%; top: 39%; width: 6px; height: 6px; border-radius: 3px; }
+.orb-p7 { left: 80%; top: 63%; opacity: 0.55; }
+.orb-p8 { left: 70%; top: 80%; width: 4px; height: 4px; opacity: 0.75; }
+.orb-p9 { left: 52%; top: 88%; }
+.orb-p10 { left: 36%; top: 78%; width: 6px; height: 6px; opacity: 0.62; }
+.orb-p11 { left: 22%; top: 66%; width: 4px; height: 4px; }
+.orb-p12 { left: 12%; top: 50%; opacity: 0.52; }
+.orb-p13 { left: 50%; top: 50%; width: 4px; height: 4px; opacity: 0.35; }
+.orb-p14 { left: 66%; top: 39%; width: 4px; height: 4px; opacity: 0.48; }
+
+.is-recording .wave-seg {
+  background: linear-gradient(180deg, #bcefff, #4e94ff 46%, #7955e5);
+}
+
+.wave-seg {
+  background: linear-gradient(180deg, #7398d4, #426ab1 46%, #5d4ba7);
+}
+
+.action-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+
+/* Keep list cards wide enough for Chinese labels on the 466 px watch face. */
+.wrist-list .glass-row {
+  width: 322px;
+}
+
+.thread-row .row-copy {
+  width: 178px;
+}
+
+.thread-row .row-label {
+  width: 178px;
+  height: 27px;
+  flex: 0;
+  font-size: 17px;
+}
+
+.thread-row .row-subtitle {
+  width: 178px;
+  font-size: 11px;
+}
+
+
+/* ListItem accepts exactly one child in API 8. The item is the glass surface;
+   its single child owns the horizontal layout. */
+.glass-row {
+  padding: 0;
+  align-items: stretch;
+}
+
+.row-inner {
+  width: 288px;
+  min-width: 288px;
+  min-height: 72px;
+  padding: 13px 17px;
+  flex-direction: row;
+  align-items: center;
+}
+
+.new-chat-row .row-inner {
+  justify-content: center;
+}
+
+.new-chat-row .row-label {
+  flex: 0;
+  width: 150px;
+}
+
+/* ZIP prototype alignment: 466 x 466 design coordinates.
+ * Materials use native gradients; particle and ribbon geometry use Canvas.
+ * Source: artifacts/NOVA-particles-huawei-prototype.zip (unmodified).
+ */
+.app, .main-swiper, .page, .subpage, .wrist-list, .result-scroll, .chat-scroll { background-color: #030305; }
+.clock { top: 24px; left: 125px; width: 90px; height: 20px; font-size: 13px; text-align: left; color: #c5bfce; }
+.status-glyph { top: 24px; right: 125px; width: 60px; height: 20px; }
+.home-page { padding: 62px 0 0; justify-content: flex-start; }
+.kicker { height: 22px; font-size: 16px; letter-spacing: 5px; }
+.orb-button { width: 270px; height: 236px; margin-top: 0; position: relative; }
+.orb-canvas { position: absolute; width: 270px; height: 270px; top: -16px; left: 0; }
+.home-title { height: 36px; font-size: 26px; margin-top: 0; }
+.gesture-hint { height: 25px; margin-top: 24px; font-size: 18px; color: #8e929b; }
+.page-dots { height: 26px; margin-top: 21px; font-size: 19px; letter-spacing: 9px; color: #717785; }
+.record-page { padding: 61px 55px 45px; justify-content: flex-start; }
+.record-topline { height: 26px; font-size: 20px; color: #b7bfcb; }
+.record-clock { height: 68px; font-size: 56px; margin-top: 13px; letter-spacing: 2px; }
+.record-wave { width: 350px; height: 128px; margin-top: -6px; }
+.record-caption { height: 25px; font-size: 18px; margin-top: -7px; margin-bottom: 17px; }
+.record-actions { height: 68px; min-height: 68px; margin-top: 0; }
+.record-main-button, .record-done-button { width: 138px; min-width: 138px; height: 68px; border-radius: 36px; }
+.is-idle .record-main-button { width: 260px; min-width: 260px; }
+.record-done-button { margin-left: 12px; }
+.pill-label { font-size: 21px; }
+.record-note { font-size: 11px; margin-top: 22px; }
+.history-page, .settings-page { padding: 0; }
+.wrist-list { width: 466px; padding: 62px 59px 110px; }
+.list-item { width: 348px; }
+.list-title { height: 36px; font-size: 24px; margin-top: 7px; margin-bottom: 24px; }
+.glass-row, .wrist-list .glass-row { width: 348px; min-height: 92px; border-radius: 46px; margin-bottom: 12px; }
+.row-inner { width: 348px; min-width: 348px; min-height: 92px; padding: 20px 24px; }
+.row-label, .thread-row .row-label { font-size: 23px; height: 30px; min-height: 30px; }
+.row-subtitle, .thread-row .row-subtitle { font-size: 16px; height: 25px; margin-top: 7px; }
+.thread-row .row-copy, .thread-row .row-label, .thread-row .row-subtitle { width: 220px; }
+.row-icon { width: 42px; height: 42px; margin-right: 16px; border-radius: 21px; background-color: #143867; color: #83b2ff; font-size: 24px; text-align: center; }
+.new-chat-row .row-inner { justify-content: flex-start; }
+.new-chat-row .row-label { width: 220px; }
+.row-chevron { font-size: 28px; color: #aaaaaa; }
+.voice-page { padding: 65px 0 0; }
+.voice-kicker { font-size: 16px; letter-spacing: 1px; }
+.voice-orb-wrap { width: 270px; height: 170px; margin-top: 0; position: relative; }
+.voice-title { font-size: 28px; }
+.voice-caption { font-size: 19px; height: 58px; width: 295px; }
+.voice-controls { margin-top: 16px; }
+.round-control { width: 64px; height: 64px; border-radius: 32px; }
+.api-page { padding: 0; }
+.result-page { padding: 59px 0 0; }
+.result-title { height: 32px; margin-bottom: 18px; font-size: 24px; }
+.segmented-control { width: 280px; height: 60px; min-height: 60px; margin-bottom: 9px; background-color: #191c24; }
+.segment-option { height: 48px; font-size: 21px; }
+.result-scroll { padding: 15px 65px 110px; }
+.result-point-text, .original-text { font-size: 23px; line-height: 40px; }
+.result-point { padding-bottom: 24px; margin-bottom: 25px; }
+.summary-counter { font-size: 16px; margin-bottom: 12px; }
+.result-intro { margin-bottom: 25px; }
+.field-page { padding: 74px 76px 65px; }
+.field-title { font-size: 26px; }
+.field-input { height: 70px; font-size: 22px; border-radius: 28px; }
+.field-save { width: 230px; height: 62px; margin-top: 27px; }
+/* Native child owns the full rounded surface; ListItem itself clips its border. */
+.row-inner, .wrist-list .row-inner { width: 300px; min-width: 300px; padding: 20px 24px; }
+.home-title { font-weight: 500; }
+.record-main-button .pill-label, .record-done-button .pill-label { font-size: 21px; }
+.record-main-button { min-width: 138px; }
+.is-idle .record-main-button { min-width: 138px; }
+.original-text { padding: 0; border-width: 0; background-color: #030305; background: linear-gradient(180deg, #030305, #030305); border-radius: 0; }
+.conversation-page { padding: 0; }
+.chat-scroll { padding: 62px 59px 110px; }
+.chat-item { width: 348px; }
+.message-row { width: 314px; padding: 20px 17px; margin-bottom: 18px; border-radius: 22px; background-color: #14161a; }
+.message-user { background-color: #132339; }
+.message-author { font-size: 15px; color: #81acfa; }
+.message-text { font-size: 23px; line-height: 39px; margin-top: 10px; }
+
+.result-intro { padding: 0; border-width: 0; border-radius: 0; background: linear-gradient(180deg, #030305, #030305); }
+.result-intro .row-label { font-size: 20px; }
+.result-intro .row-subtitle { font-size: 13px; }
+.result-point { padding: 0 0 24px; margin-bottom: 25px; border-radius: 0; border-width: 0; border-bottom-width: 1px; flex-direction: column; background: linear-gradient(180deg, #030305, #030305); }
+.summary-counter { width: 100%; height: 22px; border-radius: 0; text-align: left; background-color: #030305; color: #8ab5fa; font-size: 16px; }
+.result-point-text { width: 100%; flex: 0; min-height: 80px; font-size: 23px; line-height: 40px; }
+/* API 8 includes child padding in the ListItem measure a second time. Keep the
+   surface unpadded and place safe-area space on its content instead. */
+.row-inner, .wrist-list .row-inner { width: 348px; min-width: 348px; padding: 0; }
+.row-inner .row-icon { margin-left: 24px; }
+.row-inner .row-copy { margin-left: 24px; }
+.thread-row .row-copy { margin-left: 0; }
+.row-inner .row-chevron, .row-inner .switch-track { margin-right: 24px; }
+.row-inner > .row-label { margin-left: 24px; }
+.new-chat-row > .row-label { margin-left: 0; }
+/* Leave the list viewport full width: native wearable ListItem scales around
+   its center and must not be clipped by horizontal list padding. */
+.wrist-list, .chat-scroll { width: 466px; padding: 62px 0 110px; }
+.list-item, .chat-item { width: 348px; margin-left: 59px; margin-right: 59px; }
+.result-scroll { width: 466px; padding: 15px 0 110px; }
+.result-scroll .list-item { width: 336px; margin-left: 65px; margin-right: 65px; }
+/* Round display: keep the scrolling viewport down to the physical lower arc.
+   Trailing breathing room belongs to a scrollable item, not viewport padding. */
+.app { border-radius: 233px; overflow: hidden; }
+.wrist-list, .chat-scroll { padding: 62px 0 0; height: 466px; }
+.result-scroll { padding: 15px 0 0; height: 288px; }
+.round-scroll-spacer { width: 300px; height: 110px; }
+.round-spacer-body { width: 300px; height: 110px; }
+.voice-caption { max-lines: 2; text-overflow: ellipsis; line-height: 28px; }
+.round-bottom-shade { position: absolute; left: 0; bottom: 0; width: 466px; height: 96px; background: linear-gradient(180deg, rgba(3, 3, 5, 0), rgba(3, 3, 5, 0.88) 65%, #030305); z-index: 70; }
+/* Control audit: dimensions in the 466px design coordinate system.
+   72px maps to 49px on the smallest 320px round screen. */
+.glass-pill { height: 76px; min-height: 76px; border-radius: 38px; padding: 0 18px; }
+.pill-label { height: 34px; min-height: 34px; font-size: 24px; line-height: 34px; text-align: center; }
+.record-actions { height: 76px; min-height: 76px; }
+.record-main-button, .record-done-button { width: 150px; min-width: 150px; height: 76px; min-height: 76px; border-radius: 38px; padding: 0; }
+.is-idle .record-main-button { min-width: 150px; }
+.record-main-button .pill-label, .record-done-button .pill-label { font-size: 24px; }
+.record-note { font-size: 16px; height: 24px; margin-top: 15px; color: #8a94a4; }
+/* Single actions use one shared footprint across copy, service and field screens. */
+.action-row, .secondary-action { width: 280px; min-width: 280px; height: 76px; min-height: 76px; margin: 10px 28px; padding: 0; border-radius: 38px; }
+.field-save { width: 280px; min-width: 280px; height: 76px; min-height: 76px; margin: 22px 0 0; padding: 0; }
+/* Row actions have generous full-width hit areas; short rows need less empty space. */
+.glass-row, .wrist-list .glass-row { min-height: 100px; border-radius: 50px; }
+.row-inner, .wrist-list .row-inner { min-height: 100px; }
+.row-label, .thread-row .row-label { font-size: 25px; height: 34px; min-height: 34px; line-height: 34px; }
+.row-subtitle, .thread-row .row-subtitle { font-size: 18px; height: 28px; line-height: 28px; margin-top: 4px; }
+.row-icon { width: 48px; height: 48px; min-width: 48px; border-radius: 24px; font-size: 28px; line-height: 48px; margin-right: 16px; }
+.thread-row .row-copy, .thread-row .row-label, .thread-row .row-subtitle { width: 210px; }
+.row-chevron { width: 28px; min-width: 28px; font-size: 34px; height: 42px; line-height: 42px; }
+.switch-track { width: 64px; min-width: 64px; height: 38px; padding: 4px; border-radius: 19px; }
+.switch-knob { width: 28px; height: 28px; border-radius: 14px; }
+.switch-on .switch-knob { margin-left: 24px; }
+/* 76px buttons with 16px clear gaps: the complete group fits the lower arc. */
+.voice-page { padding-top: 59px; }
+.voice-kicker { width: 330px; height: 26px; font-size: 18px; max-lines: 1; text-overflow: ellipsis; }
+.voice-orb-wrap { height: 154px; }
+.voice-title { height: 38px; font-size: 28px; }
+.voice-caption { height: 56px; min-height: 56px; font-size: 20px; line-height: 28px; }
+.voice-controls { width: 276px; height: 80px; min-height: 80px; margin-top: 12px; }
+.round-control { width: 76px; min-width: 76px; height: 76px; min-height: 76px; margin: 0 8px; padding: 0; border-radius: 38px; }
+.control-icon { width: 32px; height: 32px; }
+/* The whole tab is interactive; do not leave a smaller hit box around its label. */
+.segmented-control { width: 300px; height: 80px; min-height: 80px; padding: 4px; border-radius: 40px; }
+.segment-option { width: 142px; height: 72px; min-height: 72px; margin-right: 4px; }
+.segment-label { width: 100%; height: 34px; font-size: 24px; line-height: 34px; text-align: center; color: #a5afbd; }
+.segment-selected .segment-label { color: #ffffff; }
+.segment-indicator { top: 4px; width: 142px; height: 72px; border-radius: 36px; }
+.segment-left { left: 4px; }
+.segment-right { left: 150px; }
+.result-scroll { height: 268px; }
+/* Inputs and feedback share the same readable type scale as the actions. */
+.field-page { padding: 62px 76px 40px; }
+.field-title { font-size: 28px; height: 42px; }
+.field-step { font-size: 18px; height: 26px; }
+.field-hint { font-size: 18px; height: 28px; margin-top: 8px; margin-bottom: 14px; }
+.field-input { width: 314px; height: 80px; font-size: 24px; border-radius: 32px; }
+.wrist-note, .subpage-hint { height: 44px; font-size: 18px; line-height: 24px; }
+.original-meta { font-size: 18px; height: 28px; }
+.summary-counter { font-size: 18px; height: 26px; }
+.result-intro .row-label { font-size: 22px; }
+.result-intro .row-subtitle { font-size: 17px; }
+.toast { min-height: 52px; }
+.toast-text { font-size: 18px; line-height: 26px; }
+
+/* Keep the voice illustration below the badge and above the headline. */
+.voice-orb-wrap .orb-canvas { width: 190px; height: 190px; left: 40px; top: 0; }
+.toast { bottom: 126px; }
+/* Headers are not ListItems: native wearable scaling must never shrink titles
+   or controls just because they are above/below the viewport center. */
+.fixed-page-title { position: absolute; top: 62px; left: 83px; width: 300px; height: 40px; font-size: 28px; font-weight: 500; text-align: center; color: #f5f7fb; max-lines: 1; text-overflow: ellipsis; z-index: 80; }
+.wrist-list, .chat-scroll { padding-top: 118px; }
+.row-subtitle { max-lines: 1; text-overflow: ellipsis; }
+.clock { font-size: 16px; height: 24px; }
+/* A fixed header needs a separate viewport, not scrollable top padding. */
+.history-page, .settings-page { position: relative; }
+.wrist-list, .chat-scroll { position: absolute; left: 0; top: 118px; height: 348px; padding: 0; }
+.api-page .wrist-list { padding-top: 0; }
+.wrist-list .action-row { margin-left: 34px; margin-right: 34px; }
+.chat-scroll .primary-action { margin: 0 0 12px; }

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" role="img" aria-labelledby="title">
+<title id="title">语音球脉冲环</title><defs><radialGradient id="fade"><stop offset=".28" stop-color="#2C8BFF" stop-opacity=".22"/><stop offset="1" stop-color="#2C8BFF" stop-opacity="0"/></radialGradient><linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#A5E5FF" stop-opacity=".8"/><stop offset=".48" stop-color="#267BFF" stop-opacity=".24"/><stop offset="1" stop-color="#786CFF" stop-opacity=".55"/></linearGradient></defs>
+<circle cx="180" cy="180" r="172" fill="url(#fade)"/>
+<circle cx="180" cy="180" r="130" fill="none" stroke="url(#ring)" stroke-width="1.4"/>
+<circle cx="180" cy="180" r="148" fill="none" stroke="#4C9EFF" stroke-opacity=".22" stroke-width="1" stroke-dasharray="2 9"/>
+<circle cx="180" cy="180" r="164" fill="none" stroke="#8ECFFF" stroke-opacity=".13" stroke-width="1"/>
+<circle cx="180" cy="50" r="3" fill="#BDEBFF"/><circle cx="296" cy="230" r="2.5" fill="#77AFFF"/><circle cx="63" cy="244" r="2" fill="#A4D9FF"/>
+</svg>

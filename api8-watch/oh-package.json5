@@ -1,0 +1,12 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "nova-watch-ai-api8",
+  "version": "0.1.0",
+  "description": "Native HarmonyOS API 8 wearable app.",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hvigor": "1.4.0",
+    "@ohos/hvigor-ohos-plugin": "1.4.0",
+    "@ohos/hypium": "1.0.5"
+  }
+}

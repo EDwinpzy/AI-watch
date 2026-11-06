@@ -1,0 +1,41 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\63054\\.ohos\\config\\auto_debug_api8-watch_com.aiwatch.watch_30086000774272021.cer",
+          "storePassword": "0000001B8DA3B6DAAD1CB99F0B42510A2D238AB9117126014B2B6289A4617870D5907476336225E76506D5",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BBDF3F8577B22C7284C391FF91F3A76DBA524C54BDC6CB2284DB6DD16CB9E1AF92BCEFDC9A75E31",
+          "profile": "C:\\Users\\63054\\.ohos\\config\\auto_debug_api8-watch_com.aiwatch.watch_30086000774272021.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\63054\\.ohos\\config\\auto_debug_api8-watch_com.aiwatch.watch_30086000774272021.p12"
+        }
+      }
+    ],
+    "compileSdkVersion": 8,
+    "compatibleSdkVersion": 8,
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}
