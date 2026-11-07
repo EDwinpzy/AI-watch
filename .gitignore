@@ -21,3 +21,13 @@ artifacts/
 *.log
 .DS_Store
 Thumbs.db
+
+# Added by project-doctor
+.kotlin/
+dist/
+*.apk
+*.aab
+.env
+test-results/
+__pycache__/
+.venv/
