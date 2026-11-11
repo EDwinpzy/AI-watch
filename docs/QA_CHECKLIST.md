@@ -102,6 +102,7 @@
 
 - [x] 语音页进入时不自动申请或启动麦克风。
 - [x] 按住开始采集；普通松开、上滑至少 28 px 后松开都会提交一次。
+- [x] 语音球横向左滑会取消采集，离页不会误发语音。
 - [x] 系统中断触摸时丢弃本次输入，不提交残缺音频。
 - [x] `python -m unittest -v scripts.test_codex_bridge`：15 项通过。
 - [x] 嵌套 `codex exec` 不再继承桌面端 Core 沙箱标记。
@@ -113,7 +114,7 @@
 - [x] `audioUrl` 为空，未生成 TTS 音频或 WAV。
 - [x] `npm run check:source`：42 项通过。
 - [x] `npm run check:core`：14 项通过。
-- [x] `npm run check:api8`：104 项通过。
+- [x] `npm run check:api8`：107 项通过。
 - [x] 真实失败路径：缺令牌返回 `401`，空消息返回 `400`，并有固定 HTTP 回归测试。
 - [x] 错误 Magpie 地址：`0.53s` 进入失败状态，`audioUrl` 为空。
 - [x] 本机 `build-profile.json5` 未入库，模板不含证书路径或口令。

@@ -210,6 +210,15 @@ assert.equal(gestureSubmits, 2, 'normal release must also submit');
 
 gesturePage.voiceActive = false;
 gesturePage.voiceState = 'idle';
+gesturePage.startVoicePress({ touches: [{ globalX: 300, globalY: 300 }] });
+gesturePage.onVoiceTouchMove({ touches: [{ globalX: 260, globalY: 300 }] });
+assert.equal(gesturePage.voiceActive, false, 'horizontal swipe must cancel capture');
+assert.equal(gesturePage.voiceCta, '按住说话');
+gesturePage.onVoiceTouchEnd({ changedTouches: [{ globalX: 260, globalY: 300 }] });
+assert.equal(gestureSubmits, 2, 'horizontal swipe release must not submit');
+
+gesturePage.voiceActive = false;
+gesturePage.voiceState = 'idle';
 gesturePage.startVoicePress({ touches: [{ globalY: 300 }] });
 gesturePage.onVoiceTouchCancel({ touches: [{ globalY: 300 }] });
 assert.equal(gestureSubmits, 2, 'cancelled touch must not submit');

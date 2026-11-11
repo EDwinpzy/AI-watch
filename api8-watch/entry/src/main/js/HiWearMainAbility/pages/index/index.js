@@ -19,6 +19,7 @@ var VOICE_SAMPLE_RATE = 16000;
 var VOICE_CHUNK_BYTES = 6400;
 var VOICE_MAX_SECONDS = 15;
 var VOICE_END_SLIDE_PX = 28;
+var VOICE_CANCEL_SLIDE_X_PX = 32;
 var RECORD_MAX_SECONDS = 60;
 var CODEX_POLL_MS = 1500;
 var LOCAL_SERVICE_URL = 'http://192.168.1.129:8787';
@@ -179,6 +180,7 @@ export default {
     this.voiceCaptureStarting = false;
     this.voicePressActive = false;
     this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     this.voiceStartedAt = 0;
     this.recordStartedAt = 0;
     this.chatSwipeAt = 0;
@@ -440,6 +442,7 @@ export default {
     this.voiceEndArmed = false;
     this.voicePressActive = false;
     this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     this.voiceResponseText = '';
     this.voiceTranscriptText = '';
     this.voiceTimer = '00:00';
@@ -465,6 +468,7 @@ export default {
     this.clearVoiceTimers();
     this.stopVoiceResources();
     this.voiceTouchStartY = this.readTouchY(event);
+    this.voiceTouchStartX = this.readTouchX(event);
     this.voicePressActive = true;
     this.voiceEndArmed = false;
     this.voiceCta = '松开发送';
@@ -508,6 +512,27 @@ export default {
     return typeof point.y === 'number' ? point.y : null;
   },
 
+  readTouchX(event) {
+    var touches = event && event.touches && event.touches.length ? event.touches : null;
+    if (!touches && event && event.changedTouches && event.changedTouches.length) {
+      touches = event.changedTouches;
+    }
+    var point = touches && touches.length ? touches[0] : event;
+    if (!point) {
+      return null;
+    }
+    if (typeof point.globalX === 'number') {
+      return point.globalX;
+    }
+    if (typeof point.clientX === 'number') {
+      return point.clientX;
+    }
+    if (typeof point.screenX === 'number') {
+      return point.screenX;
+    }
+    return typeof point.x === 'number' ? point.x : null;
+  },
+
   onVoiceTouchMove(event) {
     if (!this.voicePressActive || !this.voiceActive || this.voiceState !== 'listening') {
       return;
@@ -519,7 +544,17 @@ export default {
     if (this.voiceTouchStartY === null || currentY === null) {
       return;
     }
-    if (this.voiceTouchStartY - currentY >= VOICE_END_SLIDE_PX) {
+    var upward = this.voiceTouchStartY - currentY;
+    var currentX = this.readTouchX(event);
+    if (this.voiceTouchStartX !== null && currentX !== null) {
+      var horizontal = currentX - this.voiceTouchStartX;
+      if (Math.abs(horizontal) >= VOICE_CANCEL_SLIDE_X_PX &&
+        Math.abs(horizontal) > Math.abs(upward) * 1.2) {
+        this.cancelVoicePress();
+        return;
+      }
+    }
+    if (upward >= VOICE_END_SLIDE_PX) {
       this.voiceEndArmed = true;
       this.voiceStatus = '已上滑 · 松开结束';
     }
@@ -534,6 +569,7 @@ export default {
     }
     this.voicePressActive = false;
     this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     if (this.voiceActive && this.voiceState === 'listening') {
       this.submitVoiceTurn();
     }
@@ -546,8 +582,14 @@ export default {
     if (!this.voicePressActive) {
       return;
     }
+    this.cancelVoicePress();
+    this.showToast('本次语音未发送');
+  },
+
+  cancelVoicePress() {
     this.voicePressActive = false;
     this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     this.stopVoiceResources();
     this.clearVoiceTimers();
     this.voiceActive = false;
@@ -556,7 +598,6 @@ export default {
     this.voiceCta = '按住说话';
     this.voiceStatus = '按住说话 · 上滑结束';
     this.voiceInputLevel = 0;
-    this.showToast('本次语音未发送');
   },
 
   requestMicrophoneAndStart() {
@@ -775,6 +816,7 @@ export default {
     }
     this.voicePressActive = false;
     this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     this.voiceEndArmed = false;
     this.voiceCta = '正在处理';
     var pcm = this.concatPcmChunks();
@@ -876,6 +918,7 @@ export default {
     this.voiceEndArmed = false;
     this.voicePressActive = false;
     this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     this.voiceResponseText = '';
     this.voiceTranscriptText = '';
     this.voiceTimer = '00:00';
