@@ -17,7 +17,7 @@
 - [产品规格说明](PRODUCT_SPEC.md)
 - [页面与交互规格](INTERACTION_SPEC.md)
 - [API 接入](API_INTEGRATION.md)
-- [真实语音与模型服务](AI_SERVICE.md)
+- [旧版真实语音与模型服务（历史）](AI_SERVICE.md)
 - [ZIP 原型前端对齐记录](FRONTEND_ZIP_ALIGNMENT.md)
 - [圆屏组件尺寸核查](CONTROL_SIZE_AUDIT.md)
 

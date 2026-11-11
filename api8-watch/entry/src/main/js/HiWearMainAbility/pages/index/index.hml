@@ -1,248 +1,214 @@
 <div class="app" @swipe="handleSwipe">
-  <text class="clock">{{clockText}}</text>
-  <text class="status-glyph">● ▰</text>
+  <text if="{{mainVisible && pageIndex > 0}}" class="status-time">{{clockText}}</text>
 
-  <div if="{{mainVisible}}" class="main-swiper">
-
-    <div if="{{pageIndex === 0}}" class="page home-page">
-      <text class="kicker">NOVA</text>
-      <div class="orb-button" @click="startVoice">
-        <image class="orb-canvas" src="/common/prototype-motion/orb-idle.gif"></image>
+  <div if="{{mainVisible}}" class="main-shell">
+    <div if="{{pageIndex === 0}}" class="page watch-face">
+      <div class="face-head">
+        <text class="face-date">{{dateText}}</text>
+        <text class="face-time">{{clockText}}</text>
       </div>
-      <text class="home-title">轻触，说出想法</text>
-      <text class="gesture-hint">上下滑动切换菜单</text>
-      <text class="page-dots">● · · ·</text>
+
+      <div class="hero-complication" @click="startVoiceChat">
+        <div class="activity-ring ring-red"></div>
+        <div class="activity-ring ring-orange"></div>
+        <div class="activity-ring ring-green"></div>
+        <div class="hero-core">
+          <text class="hero-mark">✦</text>
+          <text class="hero-label">NOVA AI</text>
+          <text class="hero-action">点按说话</text>
+        </div>
+      </div>
+
+      <div class="shortcut-row">
+        <div class="shortcut-complication" @click="openQuickChat">
+          <text class="shortcut-icon blue-text">Aa</text>
+          <text class="shortcut-label">文字</text>
+        </div>
+        <div class="shortcut-complication" @click="startVoiceChat">
+          <div class="shortcut-mic">
+            <div class="mic-capsule"></div>
+            <div class="mic-cradle"></div>
+            <div class="mic-stem"></div>
+            <div class="mic-base"></div>
+          </div>
+          <text class="shortcut-label">语音</text>
+        </div>
+      </div>
+
+      <div class="page-dots">
+        <div class="page-dot dot-active"></div>
+        <div class="page-dot"></div>
+        <div class="page-dot"></div>
+        <div class="page-dot"></div>
+      </div>
     </div>
 
     <div if="{{pageIndex === 1}}" class="page record-page">
-      <div class="record-studio {{recordRunning ? 'is-recording' : (recordPaused ? 'is-paused' : 'is-idle')}}">
-        <div class="record-topline">
-          <div class="record-light" style="background-color: {{recordRunning ? '#ff617b' : (recordPaused ? '#ffc762' : '#6b788b')}};"></div>
-          <text>{{recordRunning ? '正在录制' : (recordPaused ? '录制已暂停' : '灵感速记')}}</text>
+      <text class="fixed-page-title">语音</text>
+      <div class="record-dial" @click="startVoiceChat">
+        <div class="record-ring record-ring-red"></div>
+        <div class="record-ring record-ring-orange"></div>
+        <div class="record-core">
+          <text class="timer-label">NOVA VOICE</text>
+          <div class="record-mic">
+            <div class="mic-capsule"></div>
+            <div class="mic-cradle"></div>
+            <div class="mic-stem"></div>
+            <div class="mic-base"></div>
+          </div>
+          <text class="record-caption">轻触开始说话</text>
         </div>
-        <text class="record-clock">{{recordTimer}}</text>
-        <image class="record-wave" src="/common/prototype-motion/wave-{{recordRunning ? 'running' : 'idle'}}.gif"></image>
-        <text class="record-caption">{{recordRunning ? '让想法，自然流动' : (recordPaused ? '暂停一下，思绪还在' : '轻触开始，记下这一刻')}}</text>
-        <div class="record-actions">
-          <div class="glass-pill record-main-button" style="width: {{recordHasProgress ? 150 : 280}}px; min-width: {{recordHasProgress ? 150 : 280}}px;" @click="toggleRecording"><text class="pill-label">{{recordRunning ? 'Ⅱ 暂停' : (recordPaused ? '● 继续' : '● 开始录音')}}</text></div>
-          <div if="{{recordHasProgress}}" class="glass-pill record-done-button" @click="finishRecording"><text class="pill-label">✓ 完成</text></div>
+      </div>
+      <div class="record-actions">
+        <div class="record-control control-start" @click="startVoiceChat">
+          <text class="control-symbol">●</text>
         </div>
-        <text class="record-note">模拟录音 · 不采集声音</text>
+      </div>
+      <text class="record-note">语音转文字 · AI 回复自动播报</text>
+      <div class="page-dots">
+        <div class="page-dot"></div>
+        <div class="page-dot dot-active"></div>
+        <div class="page-dot"></div>
+        <div class="page-dot"></div>
       </div>
     </div>
 
     <div if="{{pageIndex === 2}}" class="page history-page">
       <text class="fixed-page-title">最近对话</text>
-      <list itemscale="false" itemcenter="false" shapemode="round" class="wrist-list" indicator="false" @scrolltop="mainListReachedStart" @scrollbottom="mainListReachedEnd">
-        
+      <list itemscale="false" itemcenter="false" shapemode="round" class="wrist-list" @scrolltop="mainListReachedStart" @scrollbottom="mainListReachedEnd">
         <list-item class="list-item" @click="newChat">
-          <div class="glass-row row-inner new-chat-row">
-            <text class="row-icon">＋</text>
-            <text class="row-label">新建对话</text>
+          <div class="row-shell new-chat-shell">
+            <div class="row-mark row-mark-blue"><text class="row-mark-text">＋</text></div>
+            <div class="row-copy">
+              <text class="row-label">新建对话</text>
+              <text class="row-subtitle">文字或语音开始</text>
+            </div>
           </div>
         </list-item>
         <list-item class="list-item" for="{{threads}}" @click="openThread($item)">
-          <div class="glass-row row-inner thread-row">
-            <text class="row-icon">◷</text>
+          <div class="row-shell">
+            <div class="row-mark"><text class="row-mark-text">{{$item.mark}}</text></div>
             <div class="row-copy">
               <text class="row-label">{{$item.title}}</text>
-              <text class="row-subtitle">{{$item.messages.length}} 条消息</text>
-            </div>
-            </div>
-        </list-item>
-        <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
-      </list>
-    </div>
-
-    <div if="{{pageIndex === 3}}" class="page settings-page">
-      <text class="fixed-page-title">设置</text>
-      <list itemscale="false" itemcenter="false" shapemode="round" class="wrist-list" indicator="false" @scrolltop="mainListReachedStart" @scrollbottom="mainListReachedEnd">
-        
-        <list-item class="list-item" @click="openApiSettings">
-          <div class="glass-row row-inner">
-            <div class="row-copy">
-              <text class="row-label">AI 服务</text>
-              <text class="row-subtitle">{{apiSaved ? '已连接' : '在手表上逐项设置'}}</text>
+              <text class="row-subtitle">{{$item.preview}}</text>
             </div>
             <text class="row-chevron">›</text>
           </div>
         </list-item>
-        <list-item class="list-item" @click="toggleSpeaker">
-          <div class="glass-row row-inner">
-            <text class="row-label">语音播报</text>
-            <div class="switch-track" style="background-color: {{speakerOn ? '#1766eb' : '#444444'}};"><div class="switch-knob" style="margin-left: {{speakerOn ? 24 : 0}}px; background-color: {{speakerOn ? '#ffffff' : '#aaaaaa'}};"></div></div>
-          </div>
-        </list-item>
-        <list-item class="list-item" @click="toggleHaptics">
-          <div class="glass-row row-inner">
-            <div class="row-copy">
-              <text class="row-label">触感反馈</text>
-              <text class="row-subtitle">真实语音操作反馈</text>
-            </div>
-            <div class="switch-track" style="background-color: {{hapticsEnabled ? '#1766eb' : '#444444'}};"><div class="switch-knob" style="margin-left: {{hapticsEnabled ? 24 : 0}}px; background-color: {{hapticsEnabled ? '#ffffff' : '#aaaaaa'}};"></div></div>
-          </div>
-        </list-item>
-        
         <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
       </list>
-    </div>
-  </div>
-
-  <div if="{{subPage === 'voice'}}" class="subpage voice-page" @swipe="handleSwipe">
-    <text class="voice-kicker">NOVA · {{voiceState === 'listening' ? '语音对话' : voiceStatus}}</text>
-    <div class="voice-orb-wrap" @click="simulateVoiceTurn">
-      <image class="orb-canvas" src="/common/prototype-motion/orb-{{micMuted ? 'disabled' : voiceState}}.gif" @longpress="runVoiceSelfTest"></image>
-    </div>
-    <text class="voice-title">{{voiceState === 'speaking' ? '正在回答' : (voiceState === 'thinking' ? '正在思考' : '正在聆听')}}</text>
-    <text class="voice-caption">{{voiceResponseText ? voiceResponseText : (micMuted ? '麦克风已关闭' : '轻触粒子球结束这句')}}</text>
-<div class="voice-controls">
-      <div class="round-control" @click="toggleMic"><image class="control-icon" src="/common/control-icons/{{micMuted ? 'mic-off' : 'mic'}}.png"></image></div>
-      <div class="round-control round-end" @click="endVoice"><image class="control-icon" src="/common/control-icons/close.png"></image></div>
-      <div class="round-control" @click="toggleSpeaker"><image class="control-icon" src="/common/control-icons/{{speakerOn ? 'volume' : 'volume-off'}}.png"></image></div>
-    </div>
-    <div class="control-labels" show="false">
-      <text>{{micMuted ? '开麦' : '静音'}}</text>
-      <text>结束</text>
-      <text>{{speakerOn ? '静音' : '外放'}}</text>
-    </div>
-    
-  </div>
-
-  <div if="{{subPage === 'transcript'}}" class="subpage result-page" @swipe="handleSwipe">
-    <text class="result-title">录音整理</text>
-    <div class="segmented-control">
-      <div class="segment-indicator {{resultTab === 'summary' ? 'segment-left' : 'segment-right'}}"></div>
-      <div class="segment-option {{resultTab === 'summary' ? 'segment-selected' : ''}}" @click="showSummary">
-        <text class="segment-label" style="color: {{resultTab === 'summary' ? '#ffffff' : '#a5afbd'}};">摘要</text>
-      </div>
-      <div class="segment-option {{resultTab === 'original' ? 'segment-selected' : ''}}" @click="showTranscript">
-        <text class="segment-label" style="color: {{resultTab === 'original' ? '#ffffff' : '#a5afbd'}};">原文</text>
+      <div class="page-dots">
+        <div class="page-dot"></div>
+        <div class="page-dot"></div>
+        <div class="page-dot dot-active"></div>
+        <div class="page-dot"></div>
       </div>
     </div>
 
-    <list itemscale="false" itemcenter="false" class="result-scroll" indicator="false">
-      <block if="{{resultTab === 'summary'}}">
+    <div if="{{pageIndex === 3}}" class="page settings-page">
+      <text class="fixed-page-title">设置</text>
+      <list itemscale="false" itemcenter="false" shapemode="round" class="wrist-list" @scrolltop="mainListReachedStart" @scrollbottom="mainListReachedEnd">
         <list-item class="list-item">
-          <div class="result-intro">
-            <text class="result-spark">✦</text>
+          <div class="built-in-card">
+            <div class="service-head">
+              <div class="service-dot"></div>
+              <text class="service-title">内置 AI</text>
+              <text class="service-state">{{serviceStatus}}</text>
+            </div>
+            <text class="service-model">{{builtInModel}}</text>
+            <text class="service-note">连接已内置，无需在手表配置</text>
+          </div>
+        </list-item>
+        <list-item class="list-item">
+          <div class="row-shell compact-row">
+            <div class="row-mark row-mark-orange"><text class="row-mark-text">Aa</text></div>
             <div class="row-copy">
-              <text class="row-label">{{summaryItems.length}} 个重点</text>
-              <text class="row-subtitle">本地演示提炼</text>
+              <text class="row-label">语音输入</text>
+              <text class="row-subtitle">麦克风转文字后自动发送</text>
             </div>
           </div>
         </list-item>
-        <list-item class="list-item" for="{{summaryItems}}">
-          <div class="result-point">
-            <text class="summary-counter">0{{$idx + 1}}</text>
-            <text class="result-point-text">{{$item}}</text>
+        <list-item class="list-item" @click="toggleVoiceOutput">
+          <div class="row-shell compact-row">
+            <div class="row-mark row-mark-blue"><text class="row-mark-text">♪</text></div>
+            <div class="row-copy">
+              <text class="row-label">语音播报</text>
+              <text class="row-subtitle">{{voiceOutputEnabled ? 'AI 回复自动朗读 · 已开启' : 'AI 回复自动朗读 · 已关闭'}}</text>
+            </div>
+            <text class="speaker-state">{{voiceOutputEnabled ? 'ON' : 'OFF'}}</text>
           </div>
         </list-item>
-      </block>
-
-      <block if="{{resultTab === 'original'}}">
-        <list-item class="list-item"><text class="original-meta">完整转写 · 演示内容</text></list-item>
-        <list-item class="list-item"><text class="original-text">{{recordText}}</text></list-item>
-        <list-item class="list-item"><div class="glass-pill primary-action action-row" @click="copyTranscript"><text class="pill-label">复制原文</text></div></list-item>
-      </block>
-
-      <list-item if="{{resultTab === 'summary'}}" class="list-item">
-        <div class="glass-pill action-row" @click="copySummary"><text class="pill-label">复制摘要</text></div>
-      </list-item>
-      <list-item class="list-item">
-        <text class="wrist-note">右滑回到录音</text>
-      </list-item>
-      <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
+        <list-item class="list-item">
+          <div class="row-shell compact-row">
+            <div class="row-mark row-mark-green"><text class="row-mark-text">✓</text></div>
+            <div class="row-copy">
+              <text class="row-label">隐私</text>
+              <text class="row-subtitle">语音会发送到第三方服务处理</text>
+            </div>
+          </div>
+        </list-item>
+        <list-item class="list-item">
+          <div class="row-shell compact-row">
+            <div class="row-mark"><text class="row-mark-text">v</text></div>
+            <div class="row-copy">
+              <text class="row-label">NOVA Watch AI</text>
+              <text class="row-subtitle">1.2.0 · API 8</text>
+            </div>
+          </div>
+        </list-item>
+        <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
       </list>
+      <div class="page-dots">
+        <div class="page-dot"></div>
+        <div class="page-dot"></div>
+        <div class="page-dot"></div>
+        <div class="page-dot dot-active"></div>
+      </div>
+    </div>
   </div>
 
-  <div if="{{subPage === 'api'}}" class="subpage api-page" @swipe="handleSwipe">
-      <text class="fixed-page-title">AI 服务</text>
-    <list itemscale="false" itemcenter="false" shapemode="round" class="wrist-list" indicator="false">
-      
-      
-      <list-item class="list-item" @click="openField('url')">
-          <div class="glass-row row-inner">
-          <div class="row-copy">
-            <text class="row-label">服务地址</text>
-            <text class="row-subtitle">{{apiBaseUrl}}</text>
-          </div>
-          <text class="row-chevron">›</text>
-        </div>
-      </list-item>
-      <list-item class="list-item" @click="openField('key')">
-          <div class="glass-row row-inner">
-          <div class="row-copy">
-            <text class="row-label">API 密钥</text>
-            <text class="row-subtitle">{{apiKey ? '已填写 · ••••••' : '未填写'}}</text>
-          </div>
-          <text class="row-chevron">›</text>
-        </div>
-      </list-item>
-      <list-item class="list-item" @click="openField('model')">
-          <div class="glass-row row-inner">
-          <div class="row-copy">
-            <text class="row-label">模型名称</text>
-            <text class="row-subtitle">{{apiModel}}</text>
-          </div>
-          <text class="row-chevron">›</text>
-        </div>
-      </list-item>
-      <list-item class="list-item">
-        <div class="glass-pill primary-action action-row" @click="saveApiSettings"><text class="pill-label">检查配置</text></div>
-      </list-item>
-      <list-item class="list-item">
-        <div class="glass-pill action-row" @click="resetApiSettings"><text class="pill-label">清空配置</text></div>
-      </list-item>
-      <list-item class="list-item">
-        <text class="wrist-note">每个字段单独编辑 · 右滑返回设置</text>
-      </list-item>
-      <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
-      </list>
-  </div>
-
-  <div if="{{subPage === 'field'}}" class="subpage field-page" @swipe="handleSwipe">
-    <text class="field-title">{{fieldTitle}}</text>
-    <text class="field-step">{{fieldStep}}</text>
-    <text class="field-hint">{{fieldHint}}</text>
-    <input
-      if="{{fieldName === 'key'}}"
-      class="field-input"
-      type="password"
-      value="{{fieldValue}}"
-      focus="true"
-      @change="onFieldInput" />
-    <input
-      if="{{fieldName !== 'key'}}"
-      class="field-input"
-      type="text"
-      value="{{fieldValue}}"
-      focus="true"
-      @change="onFieldInput" />
-    <div class="glass-pill primary-action field-save" @click="saveField"><text class="pill-label">保存</text></div>
-    <text class="subpage-hint">右滑取消本次修改</text>
-  </div>
-
-  <div if="{{subPage === 'chat'}}" class="subpage conversation-page" @swipe="handleSwipe">
-    <text class="fixed-page-title">{{chatTitle}}</text>
-    <list itemscale="false" itemcenter="false" class="wrist-list chat-scroll" indicator="false">
-      
+  <div if="{{subPage === 'chat'}}" class="subpage conversation-page">
+    <text class="status-time">{{clockText}}</text>
+    <text class="fixed-page-title chat-title">{{chatTitle}}</text>
+    <div if="{{voicePhase !== 'idle'}}" class="voice-state">
+      <div class="voice-state-dot {{voicePhase === 'listening' ? 'voice-state-live' : ''}}"></div>
+      <text class="voice-state-text">{{voiceStatusText}}</text>
+      <text if="{{voicePhase === 'listening'}}" class="voice-state-timer">{{voiceTimer}}</text>
+    </div>
+    <list itemscale="false" itemcenter="false" class="chat-scroll">
       <list-item class="chat-item" for="{{chatMessages}}">
         <div class="message-row {{$item.role === 'user' ? 'message-user' : 'message-assistant'}}">
-          <text class="message-author">{{$item.role === 'user' ? '你' : 'NOVA'}}</text>
+          <text class="message-author">{{$item.role === 'user' ? 'YOU' : 'NOVA'}}</text>
           <text class="message-text">{{$item.text}}</text>
         </div>
       </list-item>
-      <list-item if="{{chatMessages.length === 0}}" class="chat-item"><text class="chat-empty">轻触下方，开始说话</text></list-item>
-      <list-item class="list-item"><div class="glass-row row-inner primary-action" @click="startVoice"><text class="pill-label">◉ 语音回复</text></div></list-item>
-      <list-item class="list-item"><div class="glass-row row-inner" @click="continueChat"><text class="pill-label">继续展开</text></div></list-item>
+      <list-item if="{{chatMessages.length === 0}}" class="chat-item">
+        <div class="chat-empty-card">
+          <text class="chat-empty-mark">✦</text>
+          <text class="chat-empty">输入一句话开始</text>
+        </div>
+      </list-item>
       <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
-      </list>
+    </list>
+    <div class="composer">
+      <input class="composer-input" type="text" value="{{chatInput}}" placeholder="{{composerPlaceholder}}" @change="onChatInput" />
+      <div class="voice-button {{voicePhase === 'listening' ? 'voice-button-live' : (voicePhase === 'speaking' ? 'voice-button-speaking' : '')}}" @click="toggleVoiceInput">
+        <div if="{{voicePhase === 'listening'}}" class="record-stop-glyph"></div>
+        <text if="{{voicePhase === 'requesting' || voicePhase === 'transcribing' || voicePhase === 'thinking'}}" class="voice-busy-label">…</text>
+        <div if="{{voicePhase === 'idle' || voicePhase === 'speaking' || voicePhase === 'error'}}" class="mic-glyph">
+          <div class="mic-capsule"></div>
+          <div class="mic-cradle"></div>
+          <div class="mic-stem"></div>
+          <div class="mic-base"></div>
+        </div>
+      </div>
+      <div class="send-button {{chatRequestPending ? 'send-disabled' : ''}}" @click="sendChat">
+        <text class="send-label">{{chatRequestPending ? '…' : '↑'}}</text>
+      </div>
+    </div>
   </div>
-
-  <div if="{{subPage === 'transcript' || subPage === 'chat' || subPage === 'api' || (mainVisible && pageIndex >= 2)}}" class="round-bottom-shade"></div>
 
   <div if="{{toastVisible}}" class="toast">
     <text class="toast-text">{{toastText}}</text>
   </div>
 </div>
-

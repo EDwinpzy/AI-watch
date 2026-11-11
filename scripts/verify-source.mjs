@@ -72,12 +72,17 @@ const api8Hml = read(
 const api8Css = read(
   'api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.css'
 );
+const api8Strings = JSON.parse(
+  read('api8-watch/entry/src/main/resources/base/element/string.json')
+);
 const api8RootHvigorfile = read('api8-watch/hvigorfile.ts');
 const api8EntryHvigorfile = read('api8-watch/entry/hvigorfile.ts');
 
 assert.equal(api8BuildProfile.app.compileSdkVersion, 8, 'API 8 project must compile with SDK 8');
 assert.equal(api8BuildProfile.app.compatibleSdkVersion, 8, 'API 8 project must support API 8');
 assert.deepEqual(api8Config.app.apiVersion, { compatible: 8, target: 8 });
+assert.equal(api8Config.app.version.name, '1.2.0', 'device version must include voice support');
+assert.equal(api8Config.app.version.code, 3, 'device version code must be incremented');
 assert.deepEqual(api8Config.module.deviceType, ['wearable']);
 assert.match(api8RootHvigorfile, /export \{\s*legacyAppTasks\s*\}/);
 assert.match(api8EntryHvigorfile, /export \{\s*legacyHapTasks\s*\}/);
@@ -91,19 +96,63 @@ const api8Permissions = new Set(
   (api8Config.module.reqPermissions || []).map((item) => item.name)
 );
 assert.ok(api8Permissions.has('ohos.permission.INTERNET'), 'INTERNET permission is missing');
-assert.ok(api8Permissions.has('ohos.permission.MICROPHONE'), 'MICROPHONE permission is missing');
-assert.equal(api8Config.deviceConfig.default.network.cleartextTraffic, true, 'cleartext HTTP must be enabled');
-assert.ok(api8Hml.includes('@longpress="runVoiceSelfTest"'), 'real voice self-test control is missing');
+assert.ok(api8Permissions.has('ohos.permission.MICROPHONE'), 'microphone permission is missing');
+assert.ok(
+  api8Strings.string.some((item) =>
+    item.name === 'microphone_reason' && item.value.includes('语音对话')
+  ),
+  'microphone permission reason is missing'
+);
+assert.equal(api8Config.deviceConfig.default.network.cleartextTraffic, false, 'HTTPS-only transport must be enforced');
+assert.ok(
+  api8PageSource.includes("var BUILT_IN_BASE_URL = 'https://magpie-relay.pengzhiyuan0724.workers.dev/v1';"),
+  'built-in relay URL is missing'
+);
+assert.ok(
+  api8PageSource.includes("var BUILT_IN_MODEL = 'group/ai-watch';"),
+  'built-in relay model is missing'
+);
+assert.ok(
+  api8PageSource.includes("getServiceUrl('/chat/completions')"),
+  'built-in chat completion endpoint is missing'
+);
 assert.ok(api8PageSource.includes('systemFetch.fetch(fetchOptions)'), 'real system.fetch client is missing');
-assert.ok(api8PageSource.includes('audio.createAudioCapturer(options)'), 'real audio capturer is missing');
-assert.ok(api8PageSource.includes('requestPermissionsFromUser('), 'runtime permission request is missing');
-assert.ok(api8PageSource.includes("player.on('finish'"), 'real audio playback completion handling is missing');
-assert.ok(api8Hml.includes('API 密钥') && api8PageSource.includes("apiKey: ''"), 'real-service privacy copy is missing');
+assert.ok(api8PageSource.includes('http.createHttp()'), 'binary multipart HTTP client is missing');
+assert.ok(api8PageSource.includes('audio.createAudioCapturer(options)'), 'microphone capture is missing');
+assert.ok(api8PageSource.includes('requestPermissionsFromUser'), 'runtime microphone permission is missing');
+assert.ok(api8PageSource.includes('media.createAudioPlayer()'), 'speech playback is missing');
+assert.ok(
+  api8PageSource.includes("STT_URL = 'https://notetakers.vipresearch.ca/stt/v1/transcribe'"),
+  'speech-to-text endpoint is missing'
+);
+assert.ok(
+  api8PageSource.includes("TTS_BASE_URL = 'https://translate.google.com/translate_tts'"),
+  'text-to-speech endpoint is missing'
+);
+assert.ok(api8PageSource.includes('buildWavFromPcm(pcm)'), 'PCM to WAV conversion is missing');
+assert.ok(api8PageSource.includes('buildMultipartBody('), 'multipart upload body is missing');
+assert.ok(api8PageSource.includes('splitSpeechText(text, TTS_CHUNK_CHARS)'), 'speech chunking is missing');
+assert.ok(api8PageSource.includes('max_tokens: 512'), 'chat token budget is missing');
+assert.ok(api8PageSource.includes("extractMessageText(choice && choice.message)"), 'OpenAI response parsing is missing');
+assert.ok(api8Hml.includes('class="composer-input"'), 'chat text composer is missing');
+assert.ok(api8Hml.includes('class="voice-button'), 'chat microphone button is missing');
+assert.ok(api8Hml.includes('class="voice-state"'), 'voice processing state is missing');
+assert.ok(api8Hml.includes('@click="startVoiceChat"'), 'voice entry is missing');
+assert.ok(api8Hml.includes('toggleVoiceOutput'), 'speech playback setting is missing');
+assert.ok(api8Hml.includes('class="built-in-card"'), 'built-in service status is missing');
+assert.ok(api8Hml.includes('class="hero-complication"'), 'Apple-style circular complication is missing');
+assert.ok(!api8Hml.includes('openField('), 'service field editor must be removed');
+assert.ok(!api8Hml.includes('API 密钥'), 'API key must not render on the watch');
+assert.ok(!api8Hml.includes('当前服务仅支持文本'), 'text-only capability copy must be removed');
+assert.ok(!api8Hml.includes('演示录音'), 'fake recording UI must be removed');
+assert.ok(!api8PageSource.includes('/api/voice'), 'legacy voice endpoint must be removed');
+assert.ok(!api8PageSource.includes('/api/tts'), 'legacy TTS endpoint must be removed');
+assert.ok(!api8PageSource.includes('apiBaseUrl'), 'editable service URL must be removed');
 assert.ok(
   !api8PageSource.split('\n').some((line) =>
-    /console\.|hilog/.test(line) && /apiKey|apiBaseUrl|apiModel/.test(line)
+    /console\.|hilog/.test(line) && /BUILT_IN_API_KEY|sk-magpie-key|BUILT_IN_MODEL|BUILT_IN_BASE_URL/.test(line)
   ),
-  'API 8 service settings must not be logged'
+  'built-in service credentials must not be logged'
 );
 
 assert.ok(
@@ -165,10 +214,12 @@ for (const functionName of [
   );
 }
 
+const checkCount = (fs.readFileSync(new URL(import.meta.url)).toString().match(/\bassert\./g) || []).length;
+
 console.log(JSON.stringify({
   success: true,
   screens: requiredScreens.length,
   builders: requiredBuilders.length,
   rawfiles: rawfileRefs.length,
-  checks: 39
+  checks: checkCount
 }, null, 2));

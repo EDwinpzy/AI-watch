@@ -1,5 +1,9 @@
 # NOVA Watch AI 实现与实机验证记录
 
+> 历史记录：本文描述 2026-10-25 的旧版“本地 ASR + Ollama + TTS”验证，
+> 不代表当前 `1.2.0` 的 Magpie Relay + 第三方 STT/TTS 实现。当前边界见
+> [API 接入](API_INTEGRATION.md) 和 [API 8 版本说明](../api8-watch/README.md)。
+
 更新日期：2026-10-25
 
 ## 当前结论

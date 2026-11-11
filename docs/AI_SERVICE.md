@@ -1,5 +1,9 @@
 # 真实语音与模型服务
 
+> 历史原型：本文的 PC 本地语音服务只对应旧版 Stage/API 8 验证工程。
+> 当前手表发布入口使用固定 Magpie Relay 聊天、第三方 STT 与在线 TTS，
+> 不再调用本文的 `/api/voice` 或 `/api/tts`。
+
 `scripts/ai_service.py` 是 NOVA Watch AI 的本地验证后端，运行在 PC 上，
 手表 API 8 HAP 通过局域网 HTTP 调用它。
 

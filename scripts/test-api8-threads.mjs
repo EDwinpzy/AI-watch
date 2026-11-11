@@ -4,50 +4,85 @@ import vm from 'node:vm';
 
 const sourcePath = 'api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.js';
 const hmlPath = 'api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.hml';
-// The Node VM has no HarmonyOS modules; adapt only the known platform imports.
+const cssPath = 'api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.css';
 const pageSource = fs.readFileSync(sourcePath, 'utf8');
+
 for (const specifier of [
-  '@ohos.pasteboard',
   '@ohos.multimedia.audio',
   '@ohos.ability.featureAbility',
   '@ohos.net.http',
+  '@ohos.multimedia.media',
   '@system.fetch',
-  '@ohos.multimedia.media'
+  '@ohos.util'
 ]) {
   assert.ok(
     pageSource.includes(`from '${specifier}'`),
     `expected HarmonyOS import ${specifier}`
   );
 }
+
 const source = pageSource
   .replace(/^import .* from '@(?:ohos|system)\.[^']+';\r?$/gm, '')
   .replace('export default {', 'module.exports = {');
+
+let permissionGranted = true;
+let permissionRequests = 0;
+let requestedPermissions = null;
+let permissionRequestCode = 0;
+let capturerStarts = 0;
+let capturerStops = 0;
+let audioOptions = null;
+let activeCapturer = null;
+const mediaPlayers = [];
+const httpState = {
+  calls: 0,
+  destroys: 0,
+  capturedUrl: '',
+  capturedOptions: null,
+  response: {
+    responseCode: 200,
+    result: JSON.stringify({ success: true, text: '数组缓冲转写' })
+  }
+};
+
 const sandbox = {
-  pasteboard: {
-    createPlainTextData() {
-      return {};
-    },
-    getSystemPasteboard() {
-      return {
-        setPasteData() {}
-      };
-    }
-  },
   audio: {
     AudioSamplingRate: { SAMPLE_RATE_16000: 16000 },
     AudioChannel: { CHANNEL_1: 1 },
-    AudioSampleFormat: { SAMPLE_FORMAT_S16LE: 1 },
+    AudioSampleFormat: { SAMPLE_FORMAT_S16LE: 3 },
     AudioEncodingType: { ENCODING_TYPE_RAW: 0 },
-    SourceType: { SOURCE_TYPE_MIC: 0 },
-    createAudioCapturer() {
-      throw new Error('Audio capture is outside this unit-test scope');
+    SourceType: { SOURCE_TYPE_MIC: 1 },
+    createAudioCapturer(options) {
+      audioOptions = options;
+      activeCapturer = {
+        start() {
+          capturerStarts++;
+          return Promise.resolve();
+        },
+        read() {
+          return new Promise(() => {});
+        },
+        stop() {
+          capturerStops++;
+          return Promise.resolve();
+        },
+        release() {
+          return Promise.resolve();
+        }
+      };
+      return Promise.resolve(activeCapturer);
     }
   },
   featureAbility: {
     getContext() {
       return {
-        requestPermissionsFromUser() {
-          throw new Error('Permission flow is outside this unit-test scope');
+        requestPermissionsFromUser(permissions, requestCode) {
+          permissionRequests++;
+          requestedPermissions = permissions;
+          permissionRequestCode = requestCode;
+          return Promise.resolve({
+            authResults: [permissionGranted ? 0 : -1]
+          });
         }
       };
     }
@@ -55,18 +90,74 @@ const sandbox = {
   http: {
     RequestMethod: { GET: 'GET', POST: 'POST' },
     createHttp() {
-      throw new Error('Network access is outside this unit-test scope');
-    }
-  },
-  systemFetch: {
-    fetch(options) {
-      options.success({ code: 200, data: JSON.stringify({ ok: true }) });
+      httpState.calls++;
+      return {
+        request(url, options) {
+          httpState.capturedUrl = url;
+          httpState.capturedOptions = options;
+          return Promise.resolve(httpState.response);
+        },
+        destroy() {
+          httpState.destroys++;
+        }
+      };
     }
   },
   media: {
     createAudioPlayer() {
-      throw new Error('Audio playback is outside this unit-test scope');
+      const handlers = {};
+      let stopped = false;
+      let released = false;
+      let source = '';
+      const player = {
+        setVolume() {},
+        on(type, callback) {
+          handlers[type] = callback;
+        },
+        play() {
+          if (!stopped && !released) {
+            setTimeout(() => {
+              if (!stopped && !released && handlers.finish) {
+                handlers.finish();
+              }
+            }, 0);
+          }
+        },
+        stop() {
+          stopped = true;
+        },
+        release() {
+          released = true;
+        },
+        get src() {
+          return source;
+        },
+        set src(value) {
+          source = value;
+          setTimeout(() => {
+            if (!stopped && !released && handlers.dataLoad) {
+              handlers.dataLoad();
+            }
+          }, 0);
+        }
+      };
+      mediaPlayers.push(player);
+      return player;
     }
+  },
+  systemFetch: {
+    fetch(options) {
+      options.success({
+        code: 200,
+        data: JSON.stringify({
+          model: 'group/ai-watch',
+          ok: true
+        })
+      });
+    }
+  },
+  util: {
+    TextDecoder
   },
   module: { exports: {} },
   exports: {},
@@ -75,197 +166,302 @@ const sandbox = {
   clearTimeout,
   setInterval,
   clearInterval,
-  Date
+  Date,
+  Uint8Array,
+  Int16Array,
+  DataView,
+  ArrayBuffer,
+  Promise
 };
+
 vm.runInNewContext(source, sandbox, { filename: sourcePath });
 const component = sandbox.module.exports;
 const page = Object.assign({}, structuredClone(component.data), component);
+page.onInit();
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const view = (buffer) => new DataView(buffer);
+const asciiAt = (buffer, offset, length) =>
+  Buffer.from(new Uint8Array(buffer, offset, length)).toString('ascii');
 
 assert.equal(page.threads.length, 2);
-assert.equal(page.getServiceUrl('/health'), 'http://192.168.1.129:8787/health');
-const pcm = new Int16Array([0, 16384, -16384]);
-assert.ok(page.computePcmLevel(pcm.buffer) > 20);
-assert.equal(page.encodePcmBase64(new Uint8Array([97, 98, 99]).buffer), 'YWJj');
-const fetchResult = await page.networkRequest('http://example.test/health', { method: 'GET' });
+assert.equal(page.builtInModel, 'group/ai-watch');
+assert.equal(
+  page.getServiceUrl('/chat/completions'),
+  'https://magpie-relay.pengzhiyuan0724.workers.dev/v1/chat/completions'
+);
+assert.equal(page.getServiceUrl(), 'https://magpie-relay.pengzhiyuan0724.workers.dev/v1');
+assert.equal(typeof page.openApiSettings, 'undefined');
+assert.equal(typeof page.openField, 'undefined');
+assert.equal(typeof page.submitVoiceTurn, 'undefined');
+assert.equal(typeof page.runVoiceSelfTest, 'undefined');
+assert.equal(typeof page.startRecording, 'undefined');
+assert.ok(!pageSource.includes('/api/voice'));
+assert.ok(!pageSource.includes('/api/tts'));
+assert.ok(!pageSource.includes('apiBaseUrl'));
+assert.ok(!pageSource.includes('apiKey:'));
+assert.match(pageSource, /STT_URL = 'https:\/\/notetakers\.vipresearch\.ca\/stt\/v1\/transcribe'/);
+assert.match(pageSource, /TTS_BASE_URL = 'https:\/\/translate\.google\.com\/translate_tts'/);
+
+const fetchResult = await page.networkRequest('https://example.test/v1/models', { method: 'GET' });
 assert.equal(fetchResult.responseCode, 200);
-assert.equal(page.parseHttpResult(fetchResult.result).ok, true);
+assert.equal(page.parseHttpResult(fetchResult.result).model, 'group/ai-watch');
+
+const utf8Json = new TextEncoder().encode(JSON.stringify({ text: '中文语音' }));
+assert.equal(page.parseHttpResult(utf8Json.buffer).text, '中文语音');
+
+const binaryResult = await page.binaryRequest('https://example.test/upload', {
+  method: 'POST',
+  extraData: new Uint8Array([1, 2, 3]).buffer
+});
+assert.equal(binaryResult.responseCode, 200);
+assert.equal(httpState.calls, 1);
+assert.equal(httpState.destroys, 1);
+assert.equal(httpState.capturedUrl, 'https://example.test/upload');
+assert.equal(page.parseHttpResult(binaryResult.result).text, '数组缓冲转写');
+
+const pcm = new Uint8Array(3200);
+for (let index = 0; index < pcm.length; index++) {
+  pcm[index] = index % 256;
+}
+const wav = page.buildVoiceWav(pcm.buffer);
+assert.equal(wav.byteLength, 44 + pcm.byteLength);
+assert.equal(asciiAt(wav, 0, 4), 'RIFF');
+assert.equal(asciiAt(wav, 8, 4), 'WAVE');
+assert.equal(asciiAt(wav, 12, 4), 'fmt ');
+assert.equal(asciiAt(wav, 36, 4), 'data');
+assert.equal(view(wav).getUint32(4, true), wav.byteLength - 8);
+assert.equal(view(wav).getUint16(20, true), 1);
+assert.equal(view(wav).getUint16(22, true), 1);
+assert.equal(view(wav).getUint32(24, true), 16000);
+assert.equal(view(wav).getUint32(28, true), 32000);
+assert.equal(view(wav).getUint16(34, true), 16);
+assert.equal(view(wav).getUint32(40, true), pcm.byteLength);
+
+const multipart = page.buildVoiceMultipart(wav, 'NOVA-BOUNDARY', 'nemotron', 'zh');
+const multipartText = Buffer.from(new Uint8Array(multipart)).toString('latin1');
+assert.ok(multipart.byteLength > wav.byteLength);
+assert.match(multipartText, /Content-Disposition: form-data; name="file"; filename="voice.wav"/);
+assert.match(multipartText, /Content-Type: audio\/wav/);
+assert.match(multipartText, /name="engine"\r\n\r\nnemotron/);
+assert.match(multipartText, /name="language"\r\n\r\nzh/);
+assert.ok(multipartText.startsWith('--NOVA-BOUNDARY'));
+assert.ok(multipartText.endsWith('--NOVA-BOUNDARY--\r\n'));
+
+const speechChunks = page.getSpeechChunks(
+  '第一句说明天气和出行安排。第二句说明工作重点，并提醒休息。' +
+  '第三句给出今天的行动建议。第四句提醒补充水分并安排短暂散步。' +
+  '第五句说明晚间复盘和明天优先级。第六句再次确认播报分片能够覆盖较长回复内容。'
+);
+assert.ok(speechChunks.length >= 2);
+assert.ok(speechChunks.every((chunk) => chunk.length <= 96));
+assert.ok(speechChunks.join('').includes('今天的行动建议'));
+assert.equal(
+  page.getSpeechUrl('你好 世界'),
+  'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-CN&q=' +
+    encodeURIComponent('你好 世界')
+);
+
+let capturedChat = null;
+page.networkRequest = function (url, options) {
+  capturedChat = { url, options };
+  return Promise.resolve({
+    result: JSON.stringify({
+      model: 'group/ai-watch',
+      choices: [{
+        message: {
+          content: [
+            { type: 'text', text: '内置模型回复' },
+            { type: 'text', text: '。' }
+          ]
+        }
+      }]
+    })
+  });
+};
+page.voiceOutputEnabled = false;
+page.newChat();
+page.chatInput = '网络请求测试';
+page.sendChat();
+await wait(20);
+assert.equal(page.chatMessages.at(-1).text, '内置模型回复。');
+assert.equal(page.serviceStatus, '已连接');
+assert.equal(page.chatRequestPending, false);
+assert.equal(page.voicePhase, 'idle');
+assert.equal(capturedChat.url, page.getServiceUrl('/chat/completions'));
+assert.equal(capturedChat.options.extraData.model, 'group/ai-watch');
+assert.equal(capturedChat.options.extraData.max_tokens, 512);
+assert.equal(capturedChat.options.extraData.stream, false);
+assert.equal(capturedChat.options.extraData.messages[0].role, 'system');
+assert.equal(capturedChat.options.extraData.messages.at(-1).content, '网络请求测试');
+assert.match(capturedChat.options.header.Authorization, /^Bearer sk-magpie-key-/);
+
+page.networkRequest = function () {
+  return Promise.reject(new Error('HTTP 429'));
+};
+page.chatInput = '限流测试';
+page.sendChat();
+await wait(20);
+assert.equal(page.chatMessages.at(-1).text, '请求过多，请稍后再试');
+assert.equal(page.serviceStatus, '连接失败');
+assert.equal(page.voicePhase, 'idle');
+
+permissionGranted = false;
+page.newChat();
+const deniedCount = permissionRequests;
+page.startVoiceInput();
+await wait(20);
+assert.equal(permissionRequests, deniedCount + 1);
+assert.deepEqual(Array.from(requestedPermissions), ['ohos.permission.MICROPHONE']);
+assert.equal(permissionRequestCode, 101);
+assert.equal(page.voicePhase, 'idle');
+assert.equal(page.toastText, '未获得麦克风权限');
+permissionGranted = true;
+
+let capturedTranscription = null;
+page.networkRequest = function (url, options) {
+  capturedChat = { url, options };
+  return Promise.resolve({
+    result: JSON.stringify({
+      choices: [{
+        message: { content: '这是语音问题的回答。' }
+      }]
+    })
+  });
+};
+page.binaryRequest = function (url, options) {
+  capturedTranscription = { url, options };
+  return Promise.resolve({
+    responseCode: 200,
+    result: JSON.stringify({
+      success: true,
+      text: '今天天气怎么样？',
+      engine: 'nemotron',
+      language: 'zh'
+    })
+  });
+};
+page.voiceOutputEnabled = false;
+page.newChat();
+const startsBefore = capturerStarts;
+const permissionBefore = permissionRequests;
+page.startVoiceInput();
+await wait(30);
+assert.equal(permissionRequests, permissionBefore + 1);
+assert.equal(capturerStarts, startsBefore + 1);
+assert.equal(page.voicePhase, 'listening');
+assert.equal(audioOptions.streamInfo.samplingRate, 16000);
+assert.equal(audioOptions.streamInfo.channels, 1);
+assert.equal(audioOptions.streamInfo.sampleFormat, 3);
+assert.equal(audioOptions.capturerInfo.source, 1);
+
+page.voicePcmChunks = [new Uint8Array(16000).buffer];
+page.voiceCapturedBytes = 16000;
+const stopsBefore = capturerStops;
+page.finishVoiceCapture();
+await wait(40);
+assert.equal(capturerStops, stopsBefore + 1);
+assert.equal(capturedTranscription.url, 'https://notetakers.vipresearch.ca/stt/v1/transcribe');
+assert.equal(capturedTranscription.options.extraData.byteLength > 16000, true);
+assert.match(capturedTranscription.options.header['Content-Type'], /^multipart\/form-data; boundary=/);
+assert.equal(page.chatMessages.at(-2).text, '今天天气怎么样？');
+assert.equal(page.chatMessages.at(-1).text, '这是语音问题的回答。');
+assert.equal(page.voicePhase, 'idle');
+assert.equal(page.voicePcmChunks.length, 0);
+
+page.voiceOutputEnabled = true;
+const playersBefore = mediaPlayers.length;
+page.playSpeechText(
+  '第一段播报内容比较长，需要在标点处切开并保持语义完整。' +
+  '第二段继续说明手表端使用短句分片，避免单次请求过长。' +
+  '第三段完成语音合成播报。'
+);
+await wait(80);
+assert.ok(mediaPlayers.length > playersBefore);
+assert.ok(
+  mediaPlayers.slice(playersBefore).every((player) =>
+    player.src.startsWith('https://translate.google.com/translate_tts?')
+  )
+);
+assert.equal(page.voicePhase, 'idle');
+
+page.chatMessages = [{ role: 'user', text: 'persist-api8' }];
+page.syncCurrentThread();
 page.openThreadById('ai');
 page.chatTitle = '人工智能介绍';
 page.chatMessages.push({ role: 'user', text: 'persist-api8' });
 page.syncCurrentThread();
-
 page.openThreadById('fitness');
 assert.equal(page.currentThreadId, 'fitness');
 assert.equal(page.chatMessages.some((message) => message.text === 'persist-api8'), false);
-
 page.openThreadById('ai');
 assert.equal(page.chatMessages.at(-1).text, 'persist-api8');
 assert.match(page.threads[0].preview, /persist-api8/);
 
-page.newChat();
-const newThreadId = page.currentThreadId;
-page.chatTitle = 'NewThread';
-page.chatMessages.push({ role: 'user', text: 'new-thread-message' });
-page.syncCurrentThread();
-assert.equal(page.threads.length, 3);
-
-page.clearChat();
-assert.equal(page.findThread(newThreadId).messages.length, 0);
-assert.equal(page.findThread('ai').messages.at(-1).text, 'persist-api8');
-
-assert.equal(page.chatVisible, true);
-assert.equal(page.subPage, 'chat');
-page.onBackPress();
-assert.equal(page.chatVisible, false);
-assert.equal(page.subPage, '');
-assert.equal(page.mainVisible, true);
-assert.equal(page.pageIndex, 2);
-
-let recordingTickerStopped = false;
-page.pageIndex = 1;
-page.recordRunning = true;
-page.recordSeconds = 9;
-page.recordTimer = '00:09';
-page.recordHasProgress = true;
-page.recordTicker = 1;
-const originalStopRecordingTickerOnly = page.stopRecordingTickerOnly;
-page.stopRecordingTickerOnly = function () {
-  recordingTickerStopped = true;
-  originalStopRecordingTickerOnly.call(this);
+const navigationState = {
+  subPage: page.subPage,
+  mainVisible: page.mainVisible,
+  pageIndex: page.pageIndex
 };
-page.setPage(0);
-
-assert.equal(page.pageIndex, 0);
-assert.equal(page.recordRunning, false);
-assert.equal(page.recordPaused, false);
-assert.equal(page.recordHasProgress, false);
-assert.equal(page.recordTicker, null);
-assert.equal(page.recordStatus, '轻触开始录音');
-assert.equal(page.recordControlLabel, '开始录音');
-assert.equal(page.recordSeconds, 0);
-assert.equal(page.recordTimer, '00:00');
-assert.equal(recordingTickerStopped, true);
-
-page.pageIndex = 1;
-page.recordRunning = true;
-page.recordSeconds = 7;
-page.recordTimer = '00:07';
-page.onPageChange({ index: 2 });
-assert.equal(page.pageIndex, 2);
-assert.equal(page.recordRunning, false);
-assert.equal(page.recordSeconds, 0);
-assert.equal(page.recordTimer, '00:00');
-
-page.pageIndex = 1;
-page.startRecording();
-assert.equal(page.recordRunning, true);
-assert.equal(page.recordHasProgress, true);
-assert.equal(page.recordControlLabel, 'Ⅱ 暂停');
-page.pauseRecording();
-assert.equal(page.recordRunning, false);
-assert.equal(page.recordPaused, true);
-assert.equal(page.recordControlLabel, '● 继续');
-page.resumeRecording();
-assert.equal(page.recordRunning, true);
-assert.equal(page.recordPaused, false);
-page.finishRecording();
-assert.equal(page.recordRunning, false);
-assert.equal(page.subPage, 'transcript');
-assert.equal(page.mainVisible, false);
-assert.equal(page.resultTab, 'summary');
-page.showTranscript();
-assert.equal(page.resultTab, 'original');
-page.showSummary();
-assert.equal(page.resultTab, 'summary');
-page.closeSubPage();
-assert.equal(page.pageIndex, 1);
-assert.equal(page.subPage, '');
-assert.equal(page.mainVisible, true);
-
-page.openApiSettings();
-assert.equal(page.subPage, 'api');
-page.openField('url');
-assert.equal(page.subPage, 'field');
-page.fieldValue = 'http://192.168.1.129:8787';
-page.saveField();
-assert.equal(page.subPage, 'api');
-assert.equal(page.apiBaseUrl, 'http://192.168.1.129:8787');
-page.openField('key');
-page.fieldValue = 'test-key';
-page.saveField();
-assert.equal(page.apiKey, 'test-key');
-page.toggleHaptics();
-assert.equal(page.hapticsEnabled, false);
-
-page.openThreadById('ai');
-page.networkRequest = function () {
-  return Promise.resolve({ result: JSON.stringify({ ok: true, reply: '真实模型回复' }) });
-};
-page.chatInput = '网络请求测试';
-page.sendChat();
-await new Promise((resolve) => setTimeout(resolve, 20));
-assert.equal(page.chatMessages.at(-1).text, '真实模型回复');
-assert.equal(page.serviceStatus, '已连接');
-
-// Horizontal gestures must never change the main menu or end a recording.
-const navigationState = { subPage: page.subPage, mainVisible: page.mainVisible, pageIndex: page.pageIndex };
 page.subPage = '';
 page.mainVisible = true;
 page.pageIndex = 1;
 assert.equal(page.onBackPress(), true);
 assert.equal(page.pageIndex, 1);
-page.handleSwipe({ direction: 'left' });
-assert.equal(page.pageIndex, 1);
-page.handleSwipe({ direction: 'right' });
-assert.equal(page.pageIndex, 1);
 page.pageIndex = 3;
-page.handleSwipe({ direction: 'left' });
-assert.equal(page.pageIndex, 3);
-page.handleSwipe({ direction: 'right' });
-assert.equal(page.pageIndex, 3);
 page.mainListReachedEnd();
 page.handleSwipe({ direction: 'up' });
-await new Promise((resolve) => setTimeout(resolve, 260));
+await wait(260);
 assert.equal(page.pageIndex, 0);
 page.handleSwipe({ direction: 'down' });
-await new Promise((resolve) => setTimeout(resolve, 260));
-assert.equal(page.pageIndex, 3);
-page.pageIndex = 1;
-page.recordRunning = true;
-page.recordSeconds = 4;
-page.handleSwipe({ direction: 'up' });
-await new Promise((resolve) => setTimeout(resolve, 260));
-assert.equal(page.pageIndex, 2);
-assert.equal(page.recordRunning, false);
-assert.equal(page.recordSeconds, 0);
-page.pageIndex = 2;
-page.mainListReachedStart();
-page.handleSwipe({ direction: 'up' });
-await new Promise((resolve) => setTimeout(resolve, 260));
-assert.equal(page.pageIndex, 2, 'active list scrolling must not switch the menu');
-assert.equal(page.menuSwipeTimer, null);
-page.mainListReachedEnd();
-page.handleSwipe({ direction: 'up' });
-await new Promise((resolve) => setTimeout(resolve, 260));
+await wait(260);
 assert.equal(page.pageIndex, 3);
 Object.assign(page, navigationState);
 
+page.newChat();
+page.startVoiceInput();
+await wait(20);
+assert.equal(page.voicePhase, 'listening');
+page.onBackPress();
+assert.equal(page.subPage, '');
+assert.equal(page.voicePhase, 'idle');
+assert.equal(page.mainVisible, true);
+
 const hml = fs.readFileSync(hmlPath, 'utf8');
+const css = fs.readFileSync(cssPath, 'utf8');
 assert.ok(!hml.includes('<swiper'), 'native drag offset must not compete with menu gestures');
 assert.match(hml, /pageIndex === 3/);
-assert.ok(hml.includes('上下滑动切换菜单'));
 assert.match(hml, /for="\{\{threads\}\}"/);
 assert.match(hml, /openThread\(\$item\)/);
-assert.match(hml, /glass-pill/);
-assert.match(hml, /segment-indicator/);
-assert.match(hml, /openField\('url'\)/);
+assert.match(hml, /class="hero-complication"/);
+assert.match(hml, /@click="startVoiceChat"/);
+assert.match(hml, /class="voice-button/);
+assert.match(hml, /class="voice-state"/);
+assert.match(hml, /class="composer-input"/);
+assert.match(hml, /class="built-in-card"/);
+assert.match(hml, /toggleVoiceOutput/);
+assert.ok(!hml.includes('openField('), 'service field editor must be removed');
+assert.ok(!hml.includes('API 密钥'), 'API key editor must not render');
+assert.ok(!hml.includes('runVoiceSelfTest'), 'unavailable relay voice self-test must be removed');
+assert.ok(!hml.includes('演示录音'), 'fake recording copy must be removed');
+assert.ok(!hml.includes('不采集声音'), 'text-only recording copy must be removed');
 assert.ok(!hml.includes('value="‹"'), 'prototype navigation must not render a back button');
-const assertionCount = (fs.readFileSync(new URL(import.meta.url)).toString().match(/\bassert\./g) || []).length;
+assert.match(css, /\.mic-glyph/);
+assert.match(css, /\.voice-button-live/);
+assert.ok(!/border-radius\s*:\s*[^;]*%/.test(css), 'API 8 CSS must not use percentage border-radius');
+assert.ok(!/background\s*:\s*[^;]*#[0-9a-fA-F]{3,8}/.test(css), 'API 8 solid colors must use background-color');
+assert.ok(!/:active\s+[.#]/.test(css), 'API 8 CSS must not use descendant :active selectors');
 
+page.onDestroy();
+
+const assertionCount = (fs.readFileSync(new URL(import.meta.url)).toString().match(/\bassert\./g) || []).length;
 console.log(JSON.stringify({
   success: true,
   assertions: assertionCount,
   threads: page.threads.length,
   activeThread: page.currentThreadId,
+  chatEndpoint: page.getServiceUrl('/chat/completions'),
+  transcriptionEndpoint: 'https://notetakers.vipresearch.ca/stt/v1/transcribe',
+  ttsEndpoint: 'https://translate.google.com/translate_tts',
   api8Source: sourcePath
 }, null, 2));
