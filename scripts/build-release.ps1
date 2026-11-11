@@ -16,15 +16,14 @@ $appConfig = Join-Path $apiRoot 'AppScope\app.json5'
 $moduleConfig = Join-Path $apiRoot 'entry\src\main\config.json'
 $hvigor = Join-Path $apiRoot 'node_modules\@ohos\hvigor\bin\hvigor.js'
 $sourceHap = Join-Path $apiRoot 'entry\build\default\outputs\default\entry-default-signed.hap'
-$evidenceDir = Join-Path $root 'artifacts\release-v1.2.0'
-$signatureDir = Join-Path $evidenceDir 'signing-verify'
-
 if (-not $Version) {
   $appText = Get-Content -Raw $appConfig
   $match = [regex]::Match($appText, '"versionName"\s*:\s*"([^"]+)"')
   if (-not $match.Success) { throw 'versionName not found in AppScope/app.json5' }
   $Version = $match.Groups[1].Value
 }
+$evidenceDir = Join-Path $root "artifacts\release-v$Version"
+$signatureDir = Join-Path $evidenceDir 'signing-verify'
 if (-not $SdkHome) { throw 'Set OHOS_BASE_SDK_HOME or pass -SdkHome.' }
 if (-not $HwSdk) { throw 'Set HWSDK or pass -HwSdk.' }
 if (-not $NodeExe) {

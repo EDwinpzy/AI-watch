@@ -238,7 +238,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("artifacts/release-v1.2.0/e2e/release-e2e.json"),
+        default=Path("artifacts/release-v1.2.1/e2e/release-e2e.json"),
     )
     args = parser.parse_args()
     if not args.token:

@@ -6,7 +6,7 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 
 - 原生 ArkUI HML/CSS/JS，不使用 WebView。
 - `deviceType: ["wearable"]`，target/compatible API 8。
-- 版本 `1.2.0 / versionCode 3`，包名 `com.aiwatch.watch`。
+- 版本 `1.2.1 / versionCode 4`，包名 `com.aiwatch.watch`。
 - 4 个主页面：首页、录音摘要、最近任务、设置。
 - 7 个子页面：语音、回答、任务、结果、文字聊天、服务配置、字段编辑。
 - 默认语音后端为 `codex`，同时保留 Ollama 即时链路。
@@ -80,7 +80,7 @@ npm run check:core
 npm run check:api8
 ```
 
-API 8 检查当前为 83 项，包含：
+API 8 检查当前为 104 项，包含：
 
 - 无媒体播放导入、无播放路径、无 WAV。
 - 无可见返回/关闭按钮，使用左滑逐级返回、主页面上下切页。
@@ -102,7 +102,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
 
 ## 静音构建校验
 
-2026-11-12 的本机静音构建：
+2026-11-12 的 v1.2.0 历史静音构建（保留追溯）：
 
 ```text
 文件：signing/NOVA-Watch-AI-fa-api8-codex-silent-v1.2.0.hap

@@ -191,17 +191,19 @@ python scripts/test_codex_bridge.py --long
 python scripts\test_release_e2e.py `
   --base-url http://192.168.1.129:8787 `
   --token <token> `
-  --voice-pcm artifacts\release-v1.2.0\e2e\voice-input-16k.pcm
+  --voice-pcm artifacts\release-v1.2.1\e2e\voice-input-16k.pcm
 ```
 
 覆盖健康检查、鉴权、文字任务、超过 60 秒仍可轮询、并发 `409`、
 取消、真实 PCM 语音识别和静音返回。脚本默认写入
-`artifacts/release-v1.2.0/e2e/release-e2e.json`。
+`artifacts/release-v1.2.1/e2e/release-e2e.json`。
 
-2026-11-12 的本机验证结果：
+2026-11-12 的 v1.2.1 本机验证结果：
 
 ```text
-文字任务：121.77 秒，超过 60 秒仍可查询
+真实只读读取：20.76 秒，正确读取仓库内容
+六文档长任务：76.29 秒，超过 60 秒仍可查询
+8787 设备服务真实只读任务：99.58 秒
 并发保护：409
 取消：cancelled，2.23 秒停止，子进程已退出
 语音创建：2.72 秒
