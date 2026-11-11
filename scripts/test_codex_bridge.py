@@ -458,6 +458,16 @@ class HttpRouteTests(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertFalse(payload["ok"])
 
+    def test_codex_rejects_empty_prompt(self) -> None:
+        status, payload = self.request(
+            "/api/codex/task",
+            payload={"prompt": "   ", "repoId": "watch"},
+            token="secret-token",
+        )
+        self.assertEqual(status, 400)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"], "prompt is required")
+
     def test_codex_task_and_poll(self) -> None:
         status, created = self.request(
             "/api/codex/task",

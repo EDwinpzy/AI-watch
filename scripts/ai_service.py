@@ -342,6 +342,8 @@ class Handler(BaseHTTPRequestHandler):
                 if self.path == "/api/codex/task":
                     payload = json.loads(body.decode("utf-8"))
                     prompt = str(payload.get("prompt") or "").strip()
+                    if not prompt:
+                        raise ValueError("prompt is required")
                     task = self.runtime.codex.create(
                         prompt=prompt,
                         transcript=str(payload.get("transcript") or prompt).strip(),
