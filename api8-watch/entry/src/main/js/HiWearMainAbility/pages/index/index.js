@@ -18,6 +18,7 @@ function copyMessages(messages) {
 var VOICE_SAMPLE_RATE = 16000;
 var VOICE_CHUNK_BYTES = 6400;
 var VOICE_MAX_SECONDS = 15;
+var VOICE_END_SLIDE_PX = 28;
 var RECORD_MAX_SECONDS = 60;
 var CODEX_POLL_MS = 1500;
 var LOCAL_SERVICE_URL = 'http://192.168.1.129:8787';
@@ -38,7 +39,9 @@ export default {
     voiceActive: false,
     voiceState: 'idle',
     voiceTimer: '00:00',
-    voiceStatus: '正在聆听',
+    voiceStatus: '按住说话 · 上滑结束',
+    voiceCta: '按住说话',
+    voiceEndArmed: false,
     voiceResponseText: '',
     voiceAnswerText: '',
     voiceMode: 'codex',
@@ -174,6 +177,8 @@ export default {
     this.voiceCaptureActive = false;
     this.recordCaptureActive = false;
     this.voiceCaptureStarting = false;
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
     this.voiceStartedAt = 0;
     this.recordStartedAt = 0;
     this.chatSwipeAt = 0;
@@ -424,10 +429,45 @@ export default {
   },
 
   startVoice() {
-    var self = this;
     this.voiceParentSubPage = this.subPage === 'chat' ? 'chat' : '';
-    this.openSubPage('voice');
     this.clearVoiceTimers();
+    this.stopVoiceResources();
+    this.openSubPage('voice');
+    this.voiceActive = false;
+    this.voiceState = 'idle';
+    this.voiceStatus = '按住说话 · 上滑结束';
+    this.voiceCta = '按住说话';
+    this.voiceEndArmed = false;
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceResponseText = '';
+    this.voiceTranscriptText = '';
+    this.voiceTimer = '00:00';
+    this.voiceStartedAt = 0;
+    this.voicePcmChunks = [];
+    this.voiceCapturedBytes = 0;
+    this.voiceInputLevel = 0;
+    this.micMuted = false;
+    this.micLabel = '麦克风';
+  },
+
+  startVoicePress(event) {
+    var self = this;
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    if (this.subPage !== 'voice' || this.voiceState === 'thinking' || this.voiceCaptureStarting) {
+      return;
+    }
+    if (this.voiceActive && this.voiceState === 'listening') {
+      return;
+    }
+    this.clearVoiceTimers();
+    this.stopVoiceResources();
+    this.voiceTouchStartY = this.readTouchY(event);
+    this.voicePressActive = true;
+    this.voiceEndArmed = false;
+    this.voiceCta = '松开发送';
     this.voiceActive = true;
     this.voiceState = 'listening';
     this.voiceStatus = '正在请求麦克风权限';
@@ -447,6 +487,78 @@ export default {
     this.requestMicrophoneAndStart();
   },
 
+  readTouchY(event) {
+    var touches = event && event.touches && event.touches.length ? event.touches : null;
+    if (!touches && event && event.changedTouches && event.changedTouches.length) {
+      touches = event.changedTouches;
+    }
+    var point = touches && touches.length ? touches[0] : event;
+    if (!point) {
+      return null;
+    }
+    if (typeof point.globalY === 'number') {
+      return point.globalY;
+    }
+    if (typeof point.clientY === 'number') {
+      return point.clientY;
+    }
+    if (typeof point.screenY === 'number') {
+      return point.screenY;
+    }
+    return typeof point.y === 'number' ? point.y : null;
+  },
+
+  onVoiceTouchMove(event) {
+    if (!this.voicePressActive || !this.voiceActive || this.voiceState !== 'listening') {
+      return;
+    }
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    var currentY = this.readTouchY(event);
+    if (this.voiceTouchStartY === null || currentY === null) {
+      return;
+    }
+    if (this.voiceTouchStartY - currentY >= VOICE_END_SLIDE_PX) {
+      this.voiceEndArmed = true;
+      this.voiceStatus = '已上滑 · 松开结束';
+    }
+  },
+
+  onVoiceTouchEnd(event) {
+    if (!this.voicePressActive) {
+      return;
+    }
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    if (this.voiceActive && this.voiceState === 'listening') {
+      this.submitVoiceTurn();
+    }
+  },
+
+  onVoiceTouchCancel(event) {
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    if (!this.voicePressActive) {
+      return;
+    }
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.stopVoiceResources();
+    this.clearVoiceTimers();
+    this.voiceActive = false;
+    this.voiceState = 'idle';
+    this.voiceEndArmed = false;
+    this.voiceCta = '按住说话';
+    this.voiceStatus = '按住说话 · 上滑结束';
+    this.voiceInputLevel = 0;
+    this.showToast('本次语音未发送');
+  },
+
   requestMicrophoneAndStart() {
     var self = this;
     this.voiceCaptureStarting = true;
@@ -463,6 +575,9 @@ export default {
           self.voiceState = 'error';
           self.voiceStatus = '未获得麦克风权限';
           self.voiceResponseText = '请允许麦克风权限后重试';
+          self.voicePressActive = false;
+          self.voiceEndArmed = false;
+          self.voiceCta = '按住重试';
           self.showToast('未获得麦克风权限');
           return;
         }
@@ -472,6 +587,9 @@ export default {
         self.voiceState = 'error';
         self.voiceStatus = '麦克风权限请求失败';
         self.voiceResponseText = '无法请求系统权限';
+        self.voicePressActive = false;
+        self.voiceEndArmed = false;
+        self.voiceCta = '按住重试';
         self.showToast('麦克风权限请求失败');
       });
     } catch (error) {
@@ -479,6 +597,9 @@ export default {
       this.voiceState = 'error';
       this.voiceStatus = '麦克风权限不可用';
       this.voiceResponseText = '当前系统未提供录音权限接口';
+      this.voicePressActive = false;
+      this.voiceEndArmed = false;
+      this.voiceCta = '按住重试';
       this.showToast('麦克风权限接口不可用');
     }
   },
@@ -508,7 +629,7 @@ export default {
       }
       self.voiceCaptureActive = true;
       self.voiceState = 'listening';
-      self.voiceStatus = '正在聆听 · 麦克风已连接';
+      self.voiceStatus = '正在聆听 · 松开发送 · 上滑结束';
       self.captureAudioChunk();
       self.armVoiceMaxDuration();
     }).catch(function (error) {
@@ -516,6 +637,9 @@ export default {
       self.voiceState = 'error';
       self.voiceStatus = '麦克风启动失败';
       self.voiceResponseText = '无法打开真实麦克风';
+      self.voicePressActive = false;
+      self.voiceEndArmed = false;
+      self.voiceCta = '按住重试';
       self.showToast('麦克风启动失败');
     });
   },
@@ -541,7 +665,9 @@ export default {
       self.voicePcmChunks.push(buffer);
       self.voiceCapturedBytes += buffer.byteLength;
       self.voiceInputLevel = self.computePcmLevel(buffer);
-      self.voiceStatus = '正在聆听 · 输入 ' + self.voiceInputLevel + '%';
+      if (!self.voiceEndArmed) {
+        self.voiceStatus = '正在聆听 · 输入 ' + self.voiceInputLevel + '% · 上滑结束';
+      }
       if (self.voiceCapturedBytes >= VOICE_SAMPLE_RATE * 2 * VOICE_MAX_SECONDS) {
         self.submitVoiceTurn();
         return;
@@ -552,6 +678,9 @@ export default {
         self.voiceState = 'error';
         self.voiceStatus = '麦克风读取失败';
         self.voiceResponseText = '请重新开始语音对话';
+        self.voicePressActive = false;
+        self.voiceEndArmed = false;
+        self.voiceCta = '按住重试';
       }
     });
   },
@@ -616,7 +745,7 @@ export default {
 
   simulateVoiceTurn() {
     if (!this.voiceActive) {
-      this.startVoice();
+      this.startVoicePress(null);
       return;
     }
     if (this.micMuted) {
@@ -632,9 +761,22 @@ export default {
       return;
     }
     if (this.voiceCapturedBytes < 6400) {
+      this.stopMicCapture();
+      this.clearVoiceTimers();
+      this.voiceActive = false;
+      this.voiceState = 'idle';
+      this.voiceStatus = '按住说话 · 上滑结束';
+      this.voiceCta = '按住说话';
+      this.voiceEndArmed = false;
+      this.voicePressActive = false;
+      this.voiceInputLevel = 0;
       this.showToast('说话时间太短，请再说一次');
       return;
     }
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceEndArmed = false;
+    this.voiceCta = '正在处理';
     var pcm = this.concatPcmChunks();
     this.stopMicCapture();
     this.voiceState = 'thinking';
@@ -649,6 +791,7 @@ export default {
         self.voiceState = 'error';
         self.voiceStatus = 'Codex 后端不可用';
         self.voiceResponseText = self.describeNetworkError(error);
+        self.voiceCta = '按住重试';
         self.serviceStatus = '连接失败';
         self.showToast('Codex 后端不可用');
       });
@@ -702,6 +845,7 @@ export default {
       self.voiceState = 'error';
       self.voiceStatus = '真实服务请求失败';
       self.voiceResponseText = self.describeNetworkError(error);
+      self.voiceCta = '按住重试';
       self.showToast('真实语音请求失败');
     });
   },
@@ -727,7 +871,11 @@ export default {
     this.stopVoiceResources();
     this.voiceActive = false;
     this.voiceState = 'idle';
-    this.voiceStatus = '正在聆听';
+    this.voiceStatus = '按住说话 · 上滑结束';
+    this.voiceCta = '按住说话';
+    this.voiceEndArmed = false;
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
     this.voiceResponseText = '';
     this.voiceTranscriptText = '';
     this.voiceTimer = '00:00';

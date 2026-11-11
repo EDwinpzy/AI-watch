@@ -29,6 +29,15 @@ assert.ok(
 assert.ok(!/createAudioPlayer|startTts|playAudio|player\.play|\.wav\b/.test(pageSource), 'watch audio playback path is forbidden');
 assert.ok(!/@click="(goBack|closeSubPage|closeChat)"/.test(hml), 'visible navigation buttons are forbidden');
 assert.equal((hml.match(/@swipe=/g) || []).length, 1, 'swipe handling must exist only on the root container');
+assert.ok(
+  hml.includes('@touchstart="startVoicePress"') &&
+  hml.includes('@touchmove="onVoiceTouchMove"') &&
+  hml.includes('@touchend="onVoiceTouchEnd"') &&
+  hml.includes('@touchcancel="onVoiceTouchCancel"'),
+  'voice press, release and slide-end gestures must be wired'
+);
+assert.ok(!hml.includes('@click="simulateVoiceTurn"'), 'opening the voice page must not start the microphone');
+assert.ok(hml.includes('{{voiceCta}}'), 'the voice gesture label must reflect press state');
 assert.ok(hml.includes('始终静音'), 'settings must state that the watch is always silent');
 assert.ok(hml.includes('不影响睡眠'), 'silent-mode promise is missing');
 assert.ok(
@@ -151,6 +160,62 @@ assert.equal(page.threads.length, 2);
 assert.equal(page.voiceMode, 'codex');
 assert.equal(page.codexToken, '');
 assert.equal(page.getServiceUrl('/health'), 'http://192.168.1.129:8787/health');
+
+const gesturePage = createPage();
+let gestureMicStarts = 0;
+let gestureSubmits = 0;
+gesturePage.requestMicrophoneAndStart = function () {
+  gestureMicStarts++;
+  this.voiceCaptureStarting = false;
+  this.voiceCaptureActive = true;
+  this.voiceState = 'listening';
+  this.voiceStatus = '正在聆听 · 松开发送 · 上滑结束';
+};
+gesturePage.submitVoiceTurn = function () {
+  gestureSubmits++;
+  this.voiceActive = false;
+  this.voiceState = 'thinking';
+};
+gesturePage.startVoice();
+assert.equal(gesturePage.subPage, 'voice');
+assert.equal(gesturePage.voiceActive, false, 'opening voice must wait for a press');
+assert.equal(gestureMicStarts, 0, 'opening voice must not start the microphone');
+assert.match(gesturePage.voiceStatus, /按住说话/);
+assert.equal(gesturePage.voiceCta, '按住说话');
+
+let pressPropagationStopped = false;
+gesturePage.startVoicePress({
+  touches: [{ globalY: 300 }],
+  stopPropagation() {
+    pressPropagationStopped = true;
+  }
+});
+assert.equal(gestureMicStarts, 1, 'press must start the microphone');
+assert.equal(gesturePage.voiceActive, true);
+assert.equal(gesturePage.voiceCta, '松开发送');
+assert.equal(pressPropagationStopped, true);
+gesturePage.onVoiceTouchMove({ touches: [{ globalY: 285 }] });
+assert.equal(gesturePage.voiceEndArmed, false, 'small movement must not end voice');
+gesturePage.onVoiceTouchMove({ touches: [{ globalY: 260 }] });
+assert.equal(gesturePage.voiceEndArmed, true, 'upward slide must arm voice completion');
+assert.match(gesturePage.voiceStatus, /松开结束/);
+gesturePage.onVoiceTouchEnd({ changedTouches: [{ globalY: 260 }] });
+assert.equal(gestureSubmits, 1, 'up-slide release must submit once');
+
+gesturePage.voiceActive = false;
+gesturePage.voiceState = 'idle';
+gesturePage.startVoicePress({ touches: [{ clientY: 300 }] });
+gesturePage.onVoiceTouchEnd({ changedTouches: [{ clientY: 298 }] });
+assert.equal(gestureSubmits, 2, 'normal release must also submit');
+
+gesturePage.voiceActive = false;
+gesturePage.voiceState = 'idle';
+gesturePage.startVoicePress({ touches: [{ globalY: 300 }] });
+gesturePage.onVoiceTouchCancel({ touches: [{ globalY: 300 }] });
+assert.equal(gestureSubmits, 2, 'cancelled touch must not submit');
+assert.equal(gesturePage.voiceActive, false);
+assert.equal(gesturePage.voiceState, 'idle');
+assert.equal(gesturePage.voiceCta, '按住说话');
 
 const pcm = new Int16Array([0, 16384, -16384]);
 assert.ok(page.computePcmLevel(pcm.buffer) > 20);

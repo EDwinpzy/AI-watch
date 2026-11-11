@@ -23,7 +23,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from codex_bridge import CodexTaskManager, compact_speech_text
+from codex_bridge import CodexRunner, CodexTaskManager, compact_speech_text
 
 
 FAKE_CODEX = r'''
@@ -42,6 +42,12 @@ sys.stdin.reconfigure(encoding="utf-8")
 sys.stdout.reconfigure(encoding="utf-8")
 prompt = sys.stdin.read()
 Path(os.environ["FAKE_CODEX_PROMPT_FILE"]).write_text(prompt, encoding="utf-8")
+env_file = os.environ.get("FAKE_CODEX_ENV_FILE")
+if env_file:
+    Path(env_file).write_text(json.dumps({
+        "registeredCore": os.environ.get("CODEX_WINDOWS_REGISTERED_CORE", ""),
+        "sandboxFamily": os.environ.get("CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY", ""),
+    }), encoding="utf-8")
 
 print(json.dumps({"type": "thread.started", "thread_id": "fake-thread"}), flush=True)
 if mode == "fail":
@@ -164,6 +170,44 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertLessEqual(len(spoken), 120)
         self.assertNotIn("```", spoken)
         self.assertTrue(spoken.startswith("结论"))
+
+    def test_child_environment_removes_desktop_sandbox_markers(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "CODEX_WINDOWS_REGISTERED_CORE": "1",
+                "CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY": "OpenAI.Codex_test",
+            },
+            clear=False,
+        ):
+            environment = CodexRunner._child_environment()
+        self.assertNotIn("CODEX_WINDOWS_REGISTERED_CORE", environment)
+        self.assertNotIn("CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY", environment)
+        self.assertIn("PATH", environment)
+
+    def test_spawned_codex_does_not_inherit_desktop_sandbox_markers(self) -> None:
+        server, port = _open_backend()
+        env_file = self.root / "fake-env.json"
+        os.environ["FAKE_CODEX_ENV_FILE"] = str(env_file)
+        os.environ["CODEX_WINDOWS_REGISTERED_CORE"] = "1"
+        os.environ["CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY"] = "OpenAI.Codex_test"
+        try:
+            manager = self.manager(port)
+            task = manager.create(
+                prompt="检查子进程环境",
+                transcript="检查子进程环境",
+                repo_id="watch",
+                mode="readonly",
+            )
+            result = self.wait_terminal(manager, task["taskId"])
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(
+            json.loads(env_file.read_text(encoding="utf-8")),
+            {"registeredCore": "", "sandboxFamily": ""},
+        )
 
     def test_success_parses_jsonl_and_redacts_prompt_logs(self) -> None:
         server, port = _open_backend()
