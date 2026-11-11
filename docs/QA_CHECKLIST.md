@@ -114,6 +114,8 @@
 - [x] `npm run check:source`：42 项通过。
 - [x] `npm run check:core`：14 项通过。
 - [x] `npm run check:api8`：104 项通过。
+- [x] 真实失败路径：缺令牌返回 `401`，空消息返回 `400`。
+- [x] 错误 Magpie 地址：`0.53s` 进入失败状态，`audioUrl` 为空。
 - [x] 本机 `build-profile.json5` 未入库，模板不含证书路径或口令。
 - [x] API 8 干净 debug HAP 构建成功。
 - [x] v1.2.1 干净 release 构建与签名校验通过；44 entries，0 音频/GIF。
