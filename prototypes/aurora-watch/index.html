@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN" translate="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="google" content="notranslate">
+  <title>NOVA Watch AI · Aurora Interface</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="Back to home screen">
+      <span class="brand-mark" aria-hidden="true">
+        <i class="icon brand-icon" style="--icon:url('vendor/simple-icons/openai.svg')"></i>
+      </span>
+      <span class="brand-copy">
+        <strong>NOVA</strong>
+        <small>WATCH AI / AURORA</small>
+      </span>
+    </a>
+    <div class="header-note">
+      <span class="signal-dot"></span>
+      Interactive prototype
+      <span class="header-divider"></span>
+      466 × 466
+    </div>
+  </header>
+
+  <main class="workbench">
+    <aside class="screen-rail" aria-label="Prototype screens">
+      <div class="rail-heading">
+        <span>FLOW ARCHIVE</span>
+        <strong>21 screens</strong>
+      </div>
+      <nav id="screenNav" class="screen-nav"></nav>
+      <p class="rail-footnote">
+        UI study based on the supplied watch references.<br>
+        Browser simulation · no microphone capture.
+      </p>
+    </aside>
+
+    <section class="stage" aria-label="NOVA Watch AI interactive preview">
+      <div class="stage-halo" aria-hidden="true"></div>
+      <div class="strap strap-top" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="watch" id="watchShell">
+        <div class="watch-case">
+          <div class="watch-bezel">
+            <div id="screen" class="screen" role="application" aria-label="NOVA Watch AI screen"></div>
+          </div>
+          <span class="crown" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </span>
+          <span class="side-button" aria-hidden="true"></span>
+          <span class="case-glint" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="strap strap-bottom" aria-hidden="true">
+        <span></span><span></span><span></span>
+        <small>NOVA</small>
+      </div>
+      <div class="stage-caption">
+        <span class="live-indicator"></span>
+        LIVE PROTOTYPE
+        <span>·</span>
+        Swipe or use the flow rail
+      </div>
+    </section>
+
+    <aside class="context-panel" aria-live="polite">
+      <div class="context-kicker" id="contextKicker">01 / VOICE FIRST</div>
+      <h1 id="contextTitle">A quieter way to think.</h1>
+      <p id="contextDescription">Tap the glowing orb to start a conversation. The watch surface is a live interactive prototype.</p>
+
+      <div class="live-state-block">
+        <div class="live-state-title">
+          <span>LIVE STATE</span>
+          <i></i>
+        </div>
+        <div id="stateChips" class="state-chips"></div>
+      </div>
+
+      <div class="try-block">
+        <span>TRY THE FLOW</span>
+        <button class="text-action" id="playFlow" type="button">
+          <span>Play guided interaction</span>
+          <i class="icon" style="--icon:url('vendor/phosphor/icons/play.svg')"></i>
+        </button>
+      </div>
+
+      <div class="gesture-card">
+        <div class="gesture-icon">
+          <i class="icon" style="--icon:url('vendor/phosphor/icons/dots-six.svg')"></i>
+        </div>
+        <div>
+          <strong>Desktop & touch</strong>
+          <p>Click controls, use ← → to change screens, or swipe across the watch. Esc returns home.</p>
+        </div>
+      </div>
+
+      <div class="source-note">
+        <span>VISUAL SOURCE</span>
+        <p>Recreated from the supplied ChatGPT-style watch concepts, with NOVA’s product structure.</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <span>NOVA / AURORA INTERFACE STUDY</span>
+    <span>Widgets: Phosphor + Simple Icons</span>
+    <span>2026 · DESIGN PROTOTYPE</span>
+  </footer>
+
+  <div id="globalToast" class="global-toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -81,6 +81,11 @@ scripts/start-ai-service.ps1
 `entry/src/main/resources/rawfile/`。API 8 实机构建、签名和安装说明见
 `api8-watch/README.md`。
 
+## 交互视觉原型
+
+- [Aurora Watch 466 × 466 交互原型](prototypes/aurora-watch/README.md)
+  ——纯 Web 视觉与交互演示，不修改 HAP，也不是发布入口。
+
 ## 文档
 
 - [文档索引](docs/README.md)

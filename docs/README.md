@@ -24,7 +24,10 @@
 ## 原型与设计资料
 
 以下文档保留原型阶段的设计依据。部分资源路径仍沿用早期浏览器原型布局；
-当前可运行的原型工程位于 [`prototypes/particles-nova`](../prototypes/particles-nova/README.md)。
+当前可运行的浏览器原型工程位于
+[`prototypes/particles-nova`](../prototypes/particles-nova/README.md) 和
+[`prototypes/aurora-watch`](../prototypes/aurora-watch/README.md)；两者都不是
+HAP 发布入口。
 
 - [前端架构说明](FRONTEND_ARCHITECTURE.md)
 - [开发指南](DEVELOPMENT_GUIDE.md)
@@ -33,6 +36,7 @@
 - [设计 Token](tokens.json)
 - [原型组件说明](../prototypes/particles-nova/COMPONENTS.md)
 - [腕表交互设计](../prototypes/particles-nova/WRIST-DESIGN.md)
+- [Aurora Watch 交互原型](../prototypes/aurora-watch/README.md)
 
 ## 其他验机工程
 
