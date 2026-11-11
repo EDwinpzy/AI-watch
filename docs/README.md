@@ -13,6 +13,7 @@
 - [PC 服务与 Codex 任务桥](AI_SERVICE.md)
 - [手表 API 接入](API_INTEGRATION.md)
 - [QA 清单](QA_CHECKLIST.md)
+- [v1.2.0 发布说明](RELEASE_NOTES_v1.2.0.md)
 - [Aurora Watch 交互原型](../prototypes/aurora-watch/README.md)
 
 ## 设计与开发

@@ -13,8 +13,7 @@ const requiredImports = [
   '@ohos.pasteboard',
   '@ohos.multimedia.audio',
   '@ohos.ability.featureAbility',
-  '@ohos.net.http',
-  '@system.fetch'
+  '@ohos.net.http'
 ];
 for (const specifier of requiredImports) {
   assert.ok(
@@ -32,6 +31,10 @@ assert.ok(!/@click="(goBack|closeSubPage|closeChat)"/.test(hml), 'visible naviga
 assert.equal((hml.match(/@swipe=/g) || []).length, 1, 'swipe handling must exist only on the root container');
 assert.ok(hml.includes('始终静音'), 'settings must state that the watch is always silent');
 assert.ok(hml.includes('不影响睡眠'), 'silent-mode promise is missing');
+assert.ok(
+  hml.includes("codexStatus !== 'succeeded' && codexStatus !== 'failed' && codexStatus !== 'cancelled'"),
+  'terminal Codex tasks must hide the stop action'
+);
 assert.ok(!hml.includes('<audio'), 'the watch page must not contain an audio element');
 assert.ok(!css.includes('radial-gradient'), 'API 8 CSS must not use radial gradients');
 assert.ok(!css.includes('box-shadow'), 'API 8 CSS must not use unsupported shadows');
@@ -61,7 +64,12 @@ const source = pageSource
   .replace(/^import .* from '@(?:ohos|system)\.[^']+';\r?$/gm, '')
   .replace('export default {', 'module.exports = {');
 
-let lastFetchOptions = null;
+let lastHttpRequest = null;
+let nextHttpError = null;
+let nextHttpResponse = {
+  responseCode: 200,
+  result: JSON.stringify({ ok: true })
+};
 const sandbox = {
   pasteboard: {
     createPlainTextData() {
@@ -95,13 +103,13 @@ const sandbox = {
   http: {
     RequestMethod: { GET: 'GET', POST: 'POST' },
     createHttp() {
-      throw new Error('Binary HTTP is outside this unit-test scope');
-    }
-  },
-  systemFetch: {
-    fetch(options) {
-      lastFetchOptions = options;
-      options.success({ code: 200, data: JSON.stringify({ ok: true }) });
+      return {
+        request(url, options, callback) {
+          lastHttpRequest = { url, options };
+          callback(nextHttpError, nextHttpResponse);
+        },
+        destroy() {}
+      };
     }
   },
   module: { exports: {} },
@@ -151,7 +159,42 @@ assert.equal(page.encodePcmBase64(new Uint8Array([97, 98, 99]).buffer), 'YWJj');
 const fetchResult = await page.networkRequest('http://example.test/health', { method: 'GET' });
 assert.equal(fetchResult.responseCode, 200);
 assert.equal(page.parseHttpResult(fetchResult.result).ok, true);
-assert.equal(lastFetchOptions.method, 'GET');
+assert.equal(lastHttpRequest.url, 'http://example.test/health');
+assert.equal(lastHttpRequest.options.method, 'GET');
+
+nextHttpResponse = {
+  responseCode: 200,
+  result: JSON.stringify({ ok: true, taskId: 'accepted-task' })
+};
+const accepted = await page.networkRequest('http://example.test/api/codex/task', {
+  method: 'POST',
+  header: { 'X-Nova-Token': 'test-token' },
+  extraData: { prompt: 'hi', mode: 'readonly' }
+});
+assert.equal(accepted.responseCode, 200);
+assert.equal(page.parseHttpResult(accepted.result).taskId, 'accepted-task');
+assert.equal(lastHttpRequest.options.method, 'POST');
+assert.equal(lastHttpRequest.options.header['X-Nova-Token'], 'test-token');
+assert.deepEqual(JSON.parse(lastHttpRequest.options.extraData), {
+  prompt: 'hi',
+  mode: 'readonly'
+});
+
+nextHttpResponse = {
+  responseCode: 401,
+  result: JSON.stringify({ ok: false, error: 'codex auth failed' })
+};
+await assert.rejects(
+  page.networkRequest('http://example.test/api/codex/task', {
+    method: 'POST',
+    extraData: { prompt: 'unauthorized' }
+  }),
+  /HTTP 401/
+);
+nextHttpResponse = {
+  responseCode: 200,
+  result: JSON.stringify({ ok: true })
+};
 
 await assert.rejects(
   page.submitCodexVoice(new ArrayBuffer(6400), 'voice'),

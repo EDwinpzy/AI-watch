@@ -11,6 +11,7 @@
 - 首页能量球与“开始对话 / 录音摘要”双入口。
 - 语音输入、录音、文字聊天、任务历史、服务配置和字段编辑。
 - Codex 语音任务：录音 → 本机转写 → 创建异步任务 → 1.5 秒轮询。
+- Whisper `small` 中文识别、简体中文提示词和启动预热。
 - 任务取消、超时、Magpie 不可用快速失败和进程树清理。
 - `X-Nova-Token` 鉴权、仓库白名单、单任务并发和只读沙箱。
 - 全程静音：手表不导入媒体播放模块，也不请求或下载 WAV。
@@ -46,7 +47,8 @@ powershell -ExecutionPolicy Bypass -File scripts\start-ai-service.ps1 `
 ```
 
 脚本会绑定当前局域网 IPv4、生成访问令牌并打印服务地址。默认仓库白名单
-只有 `watch=D:\MyProjects\AI-watch`，第一版只读。
+只有 `watch=D:\MyProjects\AI-watch`，第一版只读。默认 ASR 为
+Whisper `small`，服务启动时预热，并使用简体中文提示词。
 
 ## 入口
 
@@ -55,6 +57,8 @@ api8-watch/                                    正式手表 HAP
 prototypes/aurora-watch/                       466×466 Web 交互原型
 scripts/ai_service.py                          PC HTTP 服务
 scripts/codex_bridge.py                        异步 Codex 任务桥
+scripts/test_release_e2e.py                    真实服务端到端回归
+scripts/build-release.ps1                      检查、构建和签名校验
 prototypes/aurora-watch/index.html             浏览器视觉评审入口
 ```
 
@@ -77,7 +81,18 @@ node --check prototypes/aurora-watch/app.js
 python scripts/test_codex_bridge.py --long
 ```
 
+运行真实服务回归（需要 Magpie 和已启动的本地服务）：
+
+```powershell
+python scripts\test_release_e2e.py `
+  --base-url http://192.168.1.129:8787 `
+  --token <token> `
+  --voice-pcm artifacts\release-v1.2.0\e2e\voice-input-16k.pcm
+```
+
 API 8 HAP 构建方法见 [api8-watch/README.md](api8-watch/README.md)。
+正式候选包使用 `scripts\build-release.ps1`，它会先跑回归、再做干净
+release 构建、包内容静音检查和 HAP 签名校验。
 
 ## 安全与发布边界
 
@@ -86,6 +101,7 @@ API 8 HAP 构建方法见 [api8-watch/README.md](api8-watch/README.md)。
 - 第一版仅 `read-only`，写模式必须使用独立 worktree。
 - HAP、签名材料、音频、任务日志和本地服务日志不纳入 Git。
 - 明文 HTTP 只用于可信局域网验证；公网部署必须增加 HTTPS、限流和密钥托管。
+- 当前本机签名证书只生成可安装 HAP，不等同于 AppGallery 正式发布证书。
 
 ## 文档
 
@@ -96,4 +112,5 @@ API 8 HAP 构建方法见 [api8-watch/README.md](api8-watch/README.md)。
 - [PC 服务与 Codex 任务桥](docs/AI_SERVICE.md)
 - [手表 API 接入](docs/API_INTEGRATION.md)
 - [QA 清单](docs/QA_CHECKLIST.md)
+- [v1.2.0 发布说明](docs/RELEASE_NOTES_v1.2.0.md)
 - [Aurora Watch 原型](prototypes/aurora-watch/README.md)

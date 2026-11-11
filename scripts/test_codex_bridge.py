@@ -17,6 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -419,7 +420,7 @@ class HttpRouteTests(unittest.TestCase):
             payload={"prompt": "检查", "repoId": "watch"},
             token="secret-token",
         )
-        self.assertEqual(status, 202)
+        self.assertEqual(status, 200)
         self.assertEqual(created["taskId"], "task-1")
         time.sleep(0.2)
         status, polled = self.request("/api/codex/task/task-1", token="secret-token")
@@ -431,6 +432,49 @@ class HttpRouteTests(unittest.TestCase):
         status, payload = self.request("/health")
         self.assertEqual(status, 200)
         self.assertTrue(payload["codex"]["available"])
+
+
+class ServiceRuntimeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        import ai_service
+
+        cls.ai_service = ai_service
+
+    def test_parser_defaults_to_small_simplified_asr(self) -> None:
+        with mock.patch.object(sys, "argv", ["ai_service.py"]):
+            args = self.ai_service.parse_args()
+        self.assertEqual(args.whisper_model, "small")
+        self.assertTrue(args.warmup_asr)
+
+    def test_transcribe_requests_simplified_chinese(self) -> None:
+        artifacts = SCRIPT_DIR.parent / "artifacts"
+        artifacts.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=artifacts) as temp:
+            runtime = object.__new__(self.ai_service.Runtime)
+            runtime.audio_dir = Path(temp)
+            runtime.whisper_lock = threading.Lock()
+            runtime.log = lambda **_payload: None
+            runtime.args = SimpleNamespace(whisper_model="small")
+
+            class FakeModel:
+                device = SimpleNamespace(type="cpu")
+
+                def __init__(self) -> None:
+                    self.options: dict = {}
+
+                def transcribe(self, _path: str, **options) -> dict:
+                    self.options = options
+                    return {"text": "检查当前仓库，默认语音后端是什么？"}
+
+            model = FakeModel()
+            runtime.whisper_model = model
+            result = runtime.transcribe(b"\x00\x00" * 160)
+
+        self.assertEqual(result["transcript"], "检查当前仓库，默认语音后端是什么？")
+        self.assertEqual(model.options["language"], "zh")
+        self.assertFalse(model.options["condition_on_previous_text"])
+        self.assertIn("简体中文", model.options["initial_prompt"])
 
 
 def main() -> None:

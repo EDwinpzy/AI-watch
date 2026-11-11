@@ -257,11 +257,14 @@
       <text class="task-card-label">识别内容</text>
       <text class="task-card-text">{{codexTranscript || '正在转写语音…'}}</text>
     </div>
-    <div class="danger-pill task-stop" @click="cancelCodexTask">
+    <div
+      if="{{codexStatus !== 'succeeded' && codexStatus !== 'failed' && codexStatus !== 'cancelled'}}"
+      class="danger-pill task-stop"
+      @click="cancelCodexTask">
       <image class="button-icon" src="/common/interface-icons/stop-red.png"></image>
       <text class="pill-label">停止任务</text>
     </div>
-    <text class="task-note">左滑离开，任务仍在 PC 继续</text>
+    <text class="task-note">{{codexStatus === 'succeeded' || codexStatus === 'failed' || codexStatus === 'cancelled' ? '左滑离开，任务记录已保存' : '左滑离开，任务仍在 PC 继续'}}</text>
   </div>
 
   <div if="{{subPage === 'result'}}" class="subpage result-page">

@@ -2,7 +2,7 @@ param(
   [string]$AllowClient = '192.168.1.89',
   [int]$Port = 8787,
   [string]$Model = 'translategemma:4b',
-  [string]$WhisperModel = 'base',
+  [string]$WhisperModel = 'small',
   [string]$CodexToken = '',
   [string]$CodexModel = 'commandcode-plan/deepseek/deepseek-v4.1-flash',
   [string]$CodexRepo = 'D:\MyProjects\AI-watch',
@@ -21,7 +21,7 @@ if (-not $ip) {
 }
 
 $python = (Get-Command python -ErrorAction Stop).Source
-$evidence = Join-Path $root 'artifacts\ai-service\runtime-20261025'
+$evidence = Join-Path $root 'artifacts\ai-service\runtime'
 $codexTasks = Join-Path $root 'artifacts\codex-watch\tasks'
 if (-not $CodexToken) {
   $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
@@ -31,6 +31,7 @@ if (-not $CodexToken) {
 }
 Write-Host "Starting NOVA AI service on http://${ip}:$Port"
 Write-Host "Allowed watch client: $AllowClient"
+Write-Host "Whisper model: $WhisperModel"
 Write-Host "Codex access token: $CodexToken"
 Write-Host "Codex read-only repo: $CodexRepo"
 Write-Host 'Keep this process running while testing the watch.'

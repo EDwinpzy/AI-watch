@@ -8,7 +8,7 @@
 ```text
 watch PCM (16 kHz / mono / s16le)
   -> POST /api/codex/voice
-  -> Whisper 转写
+  -> Whisper small 转写（简体中文提示词）
   -> CodexTaskManager
   -> codex exec --json --ephemeral --sandbox read-only
   -> Magpie http://127.0.0.1:3425/v1
@@ -31,9 +31,20 @@ powershell -ExecutionPolicy Bypass -File scripts\start-ai-service.ps1 `
 - 绑定当前活动局域网 IPv4，默认端口 `8787`。
 - 允许手表 IP、回环地址和本机服务 IP。
 - 生成 28 位访问令牌并打印服务地址。
+- 启动时预热 Whisper，首个语音请求不再承担模型加载时间。
 - 固定 Codex 模型与 Magpie 后端。
 
-默认模型：
+默认 ASR：
+
+```text
+openai-whisper small
+```
+
+转写固定 `language=zh`，关闭上文条件，并注入
+`以下是普通话的句子，请使用简体中文。` 提示词。默认 ASR 预热可以用
+`--no-warmup-asr` 关闭。
+
+默认 Codex 模型：
 
 ```text
 commandcode-plan/deepseek/deepseek-v4.1-flash
@@ -58,6 +69,9 @@ http://127.0.0.1:3425/v1
 | POST | `/api/asr` | 客户端 allowlist | 旧原始 PCM 转写链路 |
 | POST | `/api/voice` | 客户端 allowlist | 旧 ASR + Ollama + TTS 兼容链路 |
 | POST | `/api/tts` | 客户端 allowlist | 旧兼容 TTS 端点 |
+
+两个 Codex 创建接口返回 HTTP `200`；API 8 的 `@ohos.net.http` 会把 `202`
+误报为连接异常。任务仍通过 `taskId` 和后续轮询异步执行。
 
 当前 API 8 手表不会调用 `/api/tts`、`/api/audio/*`，也不会播放
 `/api/voice` 返回的音频。新 Codex 任务的 `audioUrl` 固定为空。
@@ -170,3 +184,29 @@ python scripts/test_codex_bridge.py --long
 - Token 鉴权与旧 `/api/voice` 回归。
 
 长轮询回归验证任务超过 60 秒后仍可正常轮询。
+
+真实服务端到端回归：
+
+```powershell
+python scripts\test_release_e2e.py `
+  --base-url http://192.168.1.129:8787 `
+  --token <token> `
+  --voice-pcm artifacts\release-v1.2.0\e2e\voice-input-16k.pcm
+```
+
+覆盖健康检查、鉴权、文字任务、超过 60 秒仍可轮询、并发 `409`、
+取消、真实 PCM 语音识别和静音返回。脚本默认写入
+`artifacts/release-v1.2.0/e2e/release-e2e.json`。
+
+2026-11-12 的本机验证结果：
+
+```text
+文字任务：121.77 秒，超过 60 秒仍可查询
+并发保护：409
+取消：cancelled，2.23 秒停止，子进程已退出
+语音创建：2.72 秒
+识别：检查当前仓库,默认语音后端是什么?用一句话回答。
+返回：audioUrl 为空，无 TTS 音频文件
+```
+
+该记录证明当前本机服务和 Magpie 链路，不替代真机麦克风与网络验收。
