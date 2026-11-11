@@ -108,12 +108,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
 
 ## v1.2.1 发布候选构建
 
-2026-11-12 从干净提交 `c0d65a3` 使用 Node 14 生成并通过签名校验：
+2026-11-12 从干净提交 `6674270` 使用 Node 14 生成并通过签名校验：
 
 ```text
 文件：signing/NOVA-Watch-AI-fa-api8-v1.2.1-release.hap
-大小：1,197,999 bytes
-SHA-256：5E732B2C9512356CA0133EF3C3A1C4768A0EFF0FB1C947AA74EDF2CD95DD6973
+大小：1,198,262 bytes
+SHA-256：DD50E6C2EEFE8829FF1A522312B775227D80A0B40DD432DAC29404305A3CAD2C
 签名：hapsigntoolv2 verify success
 包内容：44 entries；WAV / MP3 / OGG / AAC / M4A / GIF 均为 0
 ```
