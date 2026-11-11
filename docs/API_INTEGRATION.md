@@ -4,10 +4,12 @@
 
 ## 网络层
 
-- `@system.fetch`：健康检查和旧 Ollama `/api/voice` 兼容链路。
-- `@ohos.net.http`：Codex 异步任务创建、轮询和取消。
+- `@ohos.net.http`：健康检查、Codex 异步任务创建/轮询/取消和旧 Ollama 链路。
 - `@ohos.multimedia.audio`：16 kHz / 单声道 / s16le PCM 采集。
 - 不存在 `@ohos.multimedia.media`、AudioPlayer 或 WAV 播放代码。
+
+创建任务的 HTTP `202 Accepted` 视为成功；不再使用 API 8
+`@system.fetch` 的 60 秒响应窗口。
 
 ## 请求头
 

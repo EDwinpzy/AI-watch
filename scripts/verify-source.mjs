@@ -93,7 +93,8 @@ const api8Permissions = new Set(
 assert.ok(api8Permissions.has('ohos.permission.INTERNET'), 'INTERNET permission is missing');
 assert.ok(api8Permissions.has('ohos.permission.MICROPHONE'), 'MICROPHONE permission is missing');
 assert.equal(api8Config.deviceConfig.default.network.cleartextTraffic, true, 'cleartext HTTP must be enabled');
-assert.ok(api8PageSource.includes('systemFetch.fetch(fetchOptions)'), 'real system.fetch client is missing');
+assert.ok(api8PageSource.includes('http.createHttp()'), 'real HTTP client is missing');
+assert.ok(!api8PageSource.includes('systemFetch.fetch('), 'legacy system.fetch client must not be used');
 assert.ok(api8PageSource.includes('audio.createAudioCapturer(options)'), 'real audio capturer is missing');
 assert.ok(api8PageSource.includes('requestPermissionsFromUser('), 'runtime permission request is missing');
 assert.ok(

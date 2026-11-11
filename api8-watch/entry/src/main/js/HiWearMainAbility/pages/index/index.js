@@ -2,7 +2,6 @@ import pasteboard from '@ohos.pasteboard';
 import audio from '@ohos.multimedia.audio';
 import featureAbility from '@ohos.ability.featureAbility';
 import http from '@ohos.net.http';
-import systemFetch from '@system.fetch';
 
 function pad2(value) {
   return value < 10 ? '0' + value : '' + value;
@@ -1164,65 +1163,34 @@ export default {
   },
 
   networkRequest(url, options) {
-    if (options.extraData instanceof ArrayBuffer) {
-      return this.httpBinaryRequest(url, options);
-    }
-    var method = options.method || 'GET';
-    return new Promise(function (resolve, reject) {
-      var fetchOptions = {
-        url: url,
-        method: method,
-        header: options.header || {},
-        responseType: 'text',
-        success: function (data) {
-          var status = data && data.code ? data.code : 200;
-          console.info('[NOVA_NET] fetch success ' + url + ' code=' + status);
-          if (status < 200 || status >= 300) {
-            reject(new Error('HTTP ' + status));
-            return;
-          }
-          resolve({ result: data ? data.data : '', responseCode: status });
-        },
-        fail: function (error, code) {
-          var message = (error && (error.message || error.data)) || ('fetch ' + code);
-          console.info('[NOVA_NET] fetch failed: ' + message);
-          reject(new Error(message));
-        }
-      };
-      if (options.extraData !== undefined && method !== 'GET') {
-        fetchOptions.data = options.extraData;
-      }
-      try {
-        systemFetch.fetch(fetchOptions);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  },
-
-  httpBinaryRequest(url, options) {
-    var self = this;
     return new Promise(function (resolve, reject) {
       var request = http.createHttp();
+      var extraData = options.extraData;
+      if (extraData !== undefined && !(extraData instanceof ArrayBuffer) &&
+        typeof extraData !== 'string') {
+        extraData = JSON.stringify(extraData);
+      }
       request.request(url, {
-        method: options.method || http.RequestMethod.POST,
+        method: options.method || http.RequestMethod.GET,
         header: options.header || {},
-        extraData: options.extraData,
+        extraData: extraData,
         connectTimeout: options.connectTimeout || 60000,
         readTimeout: options.readTimeout || 180000
       }, function (error, result) {
         try { request.destroy(); } catch (destroyError) {}
         if (error) {
           var message = error && (error.message || error.data) ? (error.message || error.data) : String(error);
-          console.info('[NOVA_NET] binary request failed: ' + message);
+          console.info('[NOVA_NET] request failed: ' + message);
           reject(new Error(message));
           return;
         }
-        if (result.responseCode < 200 || result.responseCode >= 300) {
-          reject(new Error('HTTP ' + result.responseCode));
+        var status = result && result.responseCode ? result.responseCode : 200;
+        console.info('[NOVA_NET] response ' + url + ' code=' + status);
+        if (status < 200 || status >= 300) {
+          reject(new Error('HTTP ' + status));
           return;
         }
-        resolve(result);
+        resolve({ result: result ? result.result : '', responseCode: status });
       });
     });
   },

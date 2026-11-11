@@ -11,7 +11,8 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 - 7 个子页面：语音、回答、任务、结果、文字聊天、服务配置、字段编辑。
 - 默认语音后端为 `codex`，同时保留 Ollama 即时链路。
 - Codex 任务使用 `/api/codex/voice`、`/api/codex/task`、状态轮询与取消。
-- `@ohos.net.http` 负责 Codex 异步请求，`@system.fetch` 保留健康检查与旧链路。
+- 健康检查、Codex 异步请求和旧 Ollama 链路统一使用 `@ohos.net.http`。
+- 创建任务接受 HTTP `202`，不会把 API 8 `@system.fetch` 的窗口误报成成功。
 - PC 服务默认使用 Whisper `small`、简体中文提示词和启动预热。
 - `X-Nova-Token` 只保存在当前页面内存。
 - 无 `@ohos.multimedia.media`、无 AudioPlayer、无 WAV 下载和播放路径。
@@ -79,11 +80,12 @@ npm run check:core
 npm run check:api8
 ```
 
-API 8 检查当前为 75 项，包含：
+API 8 检查当前为 82 项，包含：
 
 - 无媒体播放导入、无播放路径、无 WAV。
 - 无可见返回/关闭按钮，使用左滑逐级返回、主页面上下切页。
 - 默认 Codex、1.5 秒轮询、离页停止轮询、取消接口和令牌头。
+- JSON 请求使用 `@ohos.net.http`，接受 `202` 并拒绝非 2xx。
 - 设置页固定静音文案和聊天/录音任务状态。
 
 候选 HAP 与签名材料只保存在本机 `signing/`，不纳入 Git。
