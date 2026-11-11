@@ -31,6 +31,10 @@ assert.ok(!/@click="(goBack|closeSubPage|closeChat)"/.test(hml), 'visible naviga
 assert.equal((hml.match(/@swipe=/g) || []).length, 1, 'swipe handling must exist only on the root container');
 assert.ok(hml.includes('始终静音'), 'settings must state that the watch is always silent');
 assert.ok(hml.includes('不影响睡眠'), 'silent-mode promise is missing');
+assert.ok(
+  hml.includes("codexStatus !== 'succeeded' && codexStatus !== 'failed' && codexStatus !== 'cancelled'"),
+  'terminal Codex tasks must hide the stop action'
+);
 assert.ok(!hml.includes('<audio'), 'the watch page must not contain an audio element');
 assert.ok(!css.includes('radial-gradient'), 'API 8 CSS must not use radial gradients');
 assert.ok(!css.includes('box-shadow'), 'API 8 CSS must not use unsupported shadows');
@@ -159,7 +163,7 @@ assert.equal(lastHttpRequest.url, 'http://example.test/health');
 assert.equal(lastHttpRequest.options.method, 'GET');
 
 nextHttpResponse = {
-  responseCode: 202,
+  responseCode: 200,
   result: JSON.stringify({ ok: true, taskId: 'accepted-task' })
 };
 const accepted = await page.networkRequest('http://example.test/api/codex/task', {
@@ -167,7 +171,7 @@ const accepted = await page.networkRequest('http://example.test/api/codex/task',
   header: { 'X-Nova-Token': 'test-token' },
   extraData: { prompt: 'hi', mode: 'readonly' }
 });
-assert.equal(accepted.responseCode, 202);
+assert.equal(accepted.responseCode, 200);
 assert.equal(page.parseHttpResult(accepted.result).taskId, 'accepted-task');
 assert.equal(lastHttpRequest.options.method, 'POST');
 assert.equal(lastHttpRequest.options.header['X-Nova-Token'], 'test-token');

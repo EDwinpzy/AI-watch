@@ -105,7 +105,7 @@ def run_text_task(base_url: str, token: str, repo_id: str, timeout_seconds: floa
             "mode": "readonly",
         },
     )
-    if status != 202:
+    if status != 200:
         raise AssertionError(f"text task create failed: HTTP {status} {created}")
     result, polls, wall_seconds = poll_task(
         base_url,
@@ -136,7 +136,7 @@ def run_cancel_task(base_url: str, token: str, repo_id: str) -> dict:
             "mode": "readonly",
         },
     )
-    if status != 202:
+    if status != 200:
         raise AssertionError(f"cancel fixture create failed: HTTP {status} {first}")
 
     busy_status, busy = request_json(
@@ -200,7 +200,7 @@ def run_voice_task(
         timeout=180,
     )
     create_seconds = round(time.monotonic() - started, 2)
-    if status != 202:
+    if status != 200:
         raise AssertionError(f"voice task create failed: HTTP {status} {created}")
     if not str(created.get("transcript") or "").strip():
         raise AssertionError(f"voice transcript is empty: {created}")

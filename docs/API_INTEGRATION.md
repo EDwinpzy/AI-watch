@@ -8,8 +8,9 @@
 - `@ohos.multimedia.audio`：16 kHz / 单声道 / s16le PCM 采集。
 - 不存在 `@ohos.multimedia.media`、AudioPlayer 或 WAV 播放代码。
 
-创建任务的 HTTP `202 Accepted` 视为成功；不再使用 API 8
-`@system.fetch` 的 60 秒响应窗口。
+API 8 的 `@ohos.net.http` 会把 HTTP `202` 报告为连接异常，即使响应体已完整返回。
+因此异步任务创建接口统一返回 HTTP `200`，异步状态由响应中的 `taskId` 和 `status`
+表达；不要再使用 `@system.fetch` 的 60 秒响应窗口。
 
 ## 请求头
 

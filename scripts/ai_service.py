@@ -332,7 +332,7 @@ class Handler(BaseHTTPRequestHandler):
                         repo_id=str(payload.get("repoId") or "watch"),
                         mode=str(payload.get("mode") or "readonly"),
                     )
-                    self._send_json(HTTPStatus.ACCEPTED, {
+                    self._send_json(HTTPStatus.OK, {
                         "ok": True,
                         "taskId": task["taskId"],
                         "transcript": task["transcript"],
@@ -348,7 +348,7 @@ class Handler(BaseHTTPRequestHandler):
                         repo_id=str(payload.get("repoId") or "watch"),
                         mode=str(payload.get("mode") or "readonly"),
                     )
-                    self._send_json(HTTPStatus.ACCEPTED, {
+                    self._send_json(HTTPStatus.OK, {
                         "ok": True,
                         "taskId": task["taskId"],
                         "status": task["status"],

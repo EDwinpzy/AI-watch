@@ -420,7 +420,7 @@ class HttpRouteTests(unittest.TestCase):
             payload={"prompt": "检查", "repoId": "watch"},
             token="secret-token",
         )
-        self.assertEqual(status, 202)
+        self.assertEqual(status, 200)
         self.assertEqual(created["taskId"], "task-1")
         time.sleep(0.2)
         status, polled = self.request("/api/codex/task/task-1", token="secret-token")
