@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN" translate="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="google" content="notranslate">
+  <title>Codex Watch · 高保真交互原型</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23060b0c'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%2359e8ee' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="回到首页">
+      <span class="brand-mark"><i class="icon" style="--icon:url('vendor/simple-icons/openai.svg')"></i></span>
+      <span class="brand-copy"><strong>CODEX WATCH</strong><small>INTERACTIVE PROTOTYPE</small></span>
+    </a>
+    <div class="header-status">
+      <span class="live-dot"></span>
+      466 × 466
+      <span class="header-rule"></span>
+      GESTURE ONLY
+    </div>
+  </header>
+
+  <main class="workbench">
+    <aside class="flow-rail">
+      <div class="rail-heading">
+        <span>PRODUCT FLOW</span>
+        <strong id="flowCount">11 screens</strong>
+      </div>
+      <nav id="screenNav" class="screen-nav" aria-label="原型页面"></nav>
+      <p class="rail-note">
+        只保留现有产品真实需要的页面。<br>
+        左滑返回，上下滑切换主页面。
+      </p>
+    </aside>
+
+    <section class="stage" aria-label="Codex Watch 交互原型">
+      <div class="stage-glow" aria-hidden="true"></div>
+      <div class="strap strap-top" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="watch">
+        <div class="watch-case">
+          <div class="watch-bezel">
+            <div id="screen" class="screen" role="application" aria-label="Codex Watch 屏幕"></div>
+          </div>
+          <span class="crown" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="side-button" aria-hidden="true"></span>
+          <span class="case-shine" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="strap strap-bottom" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="stage-caption">
+        <span class="live-dot"></span>
+        LIVE PROTOTYPE
+        <b>·</b>
+        无声预览
+      </div>
+    </section>
+
+    <aside class="context-panel">
+      <span class="context-index" id="contextIndex">01 / HOME</span>
+      <h1 id="contextTitle">一句话，交给 Codex。</h1>
+      <p id="contextDescription">匹配参考图的圆屏材质、字阶、光效与控件比例，并只保留现有产品的语音、录音摘要、历史和服务配置。</p>
+      <div class="context-section">
+        <span>LIVE STATE</span>
+        <div id="contextChips" class="context-chips"></div>
+      </div>
+      <div class="gesture-card">
+        <span class="gesture-mark">↶</span>
+        <div><strong>表盘手势</strong><p>左滑逐级返回；上下滑切换首页、历史与设置；页面中没有返回按钮。</p></div>
+      </div>
+      <div class="context-section">
+        <span>BOUNDARY</span>
+        <p class="context-copy">原型不采集麦克风、不播放声音，也不会调用真实设备或模型。</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <span>CODEX WATCH / VISUAL FIDELITY STUDY</span>
+    <span>Reference geometry 466 × 466</span>
+    <span>2026 · NO AUDIO</span>
+  </footer>
+
+  <div id="globalToast" class="global-toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

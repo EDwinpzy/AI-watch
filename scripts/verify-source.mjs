@@ -93,15 +93,36 @@ const api8Permissions = new Set(
 assert.ok(api8Permissions.has('ohos.permission.INTERNET'), 'INTERNET permission is missing');
 assert.ok(api8Permissions.has('ohos.permission.MICROPHONE'), 'MICROPHONE permission is missing');
 assert.equal(api8Config.deviceConfig.default.network.cleartextTraffic, true, 'cleartext HTTP must be enabled');
-assert.ok(api8Hml.includes('@longpress="runVoiceSelfTest"'), 'real voice self-test control is missing');
 assert.ok(api8PageSource.includes('systemFetch.fetch(fetchOptions)'), 'real system.fetch client is missing');
 assert.ok(api8PageSource.includes('audio.createAudioCapturer(options)'), 'real audio capturer is missing');
 assert.ok(api8PageSource.includes('requestPermissionsFromUser('), 'runtime permission request is missing');
-assert.ok(api8PageSource.includes("player.on('finish'"), 'real audio playback completion handling is missing');
-assert.ok(api8Hml.includes('API 密钥') && api8PageSource.includes("apiKey: ''"), 'real-service privacy copy is missing');
+assert.ok(
+  !api8PageSource.includes("from '@ohos.multimedia.media'") &&
+  !/createAudioPlayer|player\.play|startTts|playAudio/.test(api8PageSource),
+  'the watch must never contain a playback path'
+);
+assert.ok(api8Hml.includes('始终静音') && api8Hml.includes('不影响睡眠'), 'silent-mode promise is missing');
+assert.ok(
+  api8PageSource.includes("voiceMode: 'codex'") &&
+  api8PageSource.includes("'/api/codex/voice'") &&
+  api8PageSource.includes("'/api/codex/task'") &&
+  api8PageSource.includes("'/cancel'") &&
+  api8PageSource.includes("'X-Nova-Token'"),
+  'Codex async client contract is incomplete'
+);
+assert.ok(api8Hml.includes('访问令牌') && api8PageSource.includes("codexToken: ''"), 'token configuration is missing');
+assert.ok(api8Hml.includes('只读仓库') && api8PageSource.includes("codexRepoId: 'watch'"), 'read-only repo selection is missing');
+assert.ok(!/@click="(goBack|closeSubPage|closeChat)"/.test(api8Hml), 'visible navigation buttons are forbidden');
+assert.ok(api8Hml.includes('@swipe="handleSwipe"'), 'watch gesture navigation is missing');
+assert.ok(
+  !api8Css.includes('radial-gradient') &&
+  !api8Css.includes('box-shadow') &&
+  !/^\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\s*\{/m.test(api8Css),
+  'API 8 CSS contains unsupported visual syntax'
+);
 assert.ok(
   !api8PageSource.split('\n').some((line) =>
-    /console\.|hilog/.test(line) && /apiKey|apiBaseUrl|apiModel/.test(line)
+    /console\.|hilog/.test(line) && /codexToken|apiKey|apiBaseUrl|prompt/.test(line)
   ),
   'API 8 service settings must not be logged'
 );

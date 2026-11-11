@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import json
 import os
+import secrets
+import shlex
 import subprocess
 import threading
 import time
@@ -19,8 +22,12 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from codex_bridge import CodexTaskManager, TaskBusyError, TaskNotFoundError
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE = ROOT / "artifacts" / "ai-service" / "runtime"
+DEFAULT_CODEX_TASKS = ROOT / "artifacts" / "codex-watch" / "tasks"
+DEFAULT_CODEX_REPO = Path(os.environ.get("NOVA_CODEX_REPO", r"D:\MyProjects\AI-watch"))
 
 
 def utc_now() -> str:
@@ -41,6 +48,36 @@ class Runtime:
         self.audio_dir.mkdir(exist_ok=True)
         self.whisper_lock = threading.Lock()
         self.whisper_model = None
+        self.codex = self._build_codex_manager()
+
+    def _build_codex_manager(self) -> CodexTaskManager:
+        repo_specs = self.args.codex_repo or [
+            f"watch={self.args.codex_default_repo}"
+        ]
+        repos: dict[str, Path] = {}
+        for spec in repo_specs:
+            if "=" in spec:
+                repo_id, raw_path = spec.split("=", 1)
+            else:
+                repo_id, raw_path = "watch", spec
+            repo_id = repo_id.strip()
+            raw_path = raw_path.strip()
+            if not repo_id or not raw_path:
+                raise ValueError("invalid --codex-repo value")
+            repos[repo_id] = Path(raw_path).expanduser().resolve()
+        command = shlex.split(self.args.codex_command, posix=False)
+        if not command:
+            raise ValueError("--codex-command cannot be empty")
+        return CodexTaskManager(
+            repo_allowlist=repos,
+            model=self.args.codex_model,
+            backend_url=self.args.codex_backend_url,
+            timeout_seconds=self.args.codex_task_timeout,
+            task_root=Path(self.args.codex_evidence_dir),
+            codex_command=command,
+            log=self.log,
+            backend_timeout=self.args.codex_backend_timeout,
+        )
 
     def log(self, **payload) -> None:
         row = {"timestamp": utc_now(), **payload}
@@ -154,6 +191,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _codex_authorized(self) -> bool:
+        expected = self.runtime.args.codex_token
+        if not expected:
+            return True
+        supplied = self.headers.get("X-Nova-Token", "")
+        if not supplied:
+            authorization = self.headers.get("Authorization", "")
+            if authorization.lower().startswith("bearer "):
+                supplied = authorization[7:]
+        return secrets.compare_digest(supplied, expected)
+
     def _read_body(self) -> bytes:
         length = int(self.headers.get("Content-Length", "0"))
         if length < 0 or length > self.runtime.args.max_body_bytes:
@@ -167,7 +215,19 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/health":
             self._send_json(HTTPStatus.OK, {"ok": True, "model": self.runtime.args.model,
                 "asr": self.runtime.args.whisper_model, "tts": "Windows SAPI zh-CN",
-                "serverTime": utc_now()})
+                "codex": self.runtime.codex.health(), "serverTime": utc_now()})
+            return
+        if self.path.startswith("/api/codex/task/"):
+            if not self._codex_authorized():
+                self._send_json(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": "codex auth failed"})
+                return
+            task_id = self.path[len("/api/codex/task/") :].strip("/")
+            try:
+                task = self.runtime.codex.get(task_id)
+            except TaskNotFoundError:
+                self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "task not found"})
+                return
+            self._send_json(HTTPStatus.OK, {"ok": True, **task})
             return
         if self.path.startswith("/api/audio/") and self.path.endswith(".wav"):
             name = Path(self.path).name
@@ -240,9 +300,71 @@ class Handler(BaseHTTPRequestHandler):
                     "timings": {"asrMs": asr["elapsedMs"], "modelMs": chat["elapsedMs"],
                                 "totalMs": total_ms}})
                 return
+            if self.path.startswith("/api/codex/"):
+                if not self._codex_authorized():
+                    self._send_json(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": "codex auth failed"})
+                    return
+                if self.path == "/api/codex/voice":
+                    payload = json.loads(body.decode("utf-8"))
+                    encoded = str(payload.get("pcmBase64") or "")
+                    if not encoded:
+                        raise ValueError("pcmBase64 is required")
+                    try:
+                        pcm = base64.b64decode(encoded, validate=True)
+                    except (binascii.Error, ValueError) as exc:
+                        raise ValueError("pcmBase64 is invalid") from exc
+                    if not pcm:
+                        raise ValueError("PCM body is required")
+                    sample_rate = int(payload.get("sampleRate") or 16000)
+                    if sample_rate != 16000:
+                        raise ValueError("sampleRate must be 16000")
+                    transcript = self.runtime.transcribe(pcm)["transcript"]
+                    task = self.runtime.codex.create(
+                        prompt=transcript,
+                        transcript=transcript,
+                        repo_id=str(payload.get("repoId") or "watch"),
+                        mode=str(payload.get("mode") or "readonly"),
+                    )
+                    self._send_json(HTTPStatus.ACCEPTED, {
+                        "ok": True,
+                        "taskId": task["taskId"],
+                        "transcript": task["transcript"],
+                        "status": task["status"],
+                    })
+                    return
+                if self.path == "/api/codex/task":
+                    payload = json.loads(body.decode("utf-8"))
+                    prompt = str(payload.get("prompt") or "").strip()
+                    task = self.runtime.codex.create(
+                        prompt=prompt,
+                        transcript=str(payload.get("transcript") or prompt).strip(),
+                        repo_id=str(payload.get("repoId") or "watch"),
+                        mode=str(payload.get("mode") or "readonly"),
+                    )
+                    self._send_json(HTTPStatus.ACCEPTED, {
+                        "ok": True,
+                        "taskId": task["taskId"],
+                        "status": task["status"],
+                    })
+                    return
+                if self.path.startswith("/api/codex/task/") and self.path.endswith("/cancel"):
+                    task_id = self.path[len("/api/codex/task/") : -len("/cancel")].strip("/")
+                    try:
+                        task = self.runtime.codex.cancel(task_id)
+                    except TaskNotFoundError:
+                        self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "task not found"})
+                        return
+                    self._send_json(HTTPStatus.OK, {
+                        "ok": True,
+                        "taskId": task["taskId"],
+                        "status": task["status"],
+                    })
+                    return
             self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not found"})
         except (ValueError, json.JSONDecodeError) as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)})
+        except TaskBusyError as exc:
+            self._send_json(HTTPStatus.CONFLICT, {"ok": False, "error": str(exc)})
         except (HTTPError, URLError, TimeoutError, subprocess.TimeoutExpired, RuntimeError) as exc:
             self.runtime.log(event="request_error", path=self.path, error=str(exc))
             self._send_json(HTTPStatus.BAD_GATEWAY, {"ok": False, "error": str(exc)})
@@ -262,6 +384,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-body-bytes", type=int, default=4 * 1024 * 1024)
     parser.add_argument("--ollama-timeout", type=int, default=180)
     parser.add_argument("--tts-timeout", type=int, default=30)
+    parser.add_argument("--codex-default-repo", default=str(DEFAULT_CODEX_REPO))
+    parser.add_argument("--codex-repo", action="append", default=[])
+    parser.add_argument(
+        "--codex-model",
+        default="commandcode-plan/deepseek/deepseek-v4.1-flash",
+    )
+    parser.add_argument("--codex-backend-url", default="http://127.0.0.1:3425/v1")
+    parser.add_argument("--codex-task-timeout", type=int, default=600)
+    parser.add_argument("--codex-command", default="codex")
+    parser.add_argument("--codex-token", default=os.environ.get("NOVA_CODEX_TOKEN", ""))
+    parser.add_argument("--codex-evidence-dir", default=str(DEFAULT_CODEX_TASKS))
+    parser.add_argument("--codex-backend-timeout", type=float, default=2.0)
     parser.add_argument("--no-warmup", action="store_false", dest="warmup", default=True)
     return parser.parse_args()
 
@@ -270,6 +404,8 @@ def main() -> None:
     args = parse_args()
     if not args.allow_client:
         args.allow_client = ["127.0.0.1", "::1"]
+    if not args.codex_token:
+        args.codex_token = secrets.token_urlsafe(18)
     runtime = Runtime(args)
     Handler.runtime = runtime
     if args.warmup:
@@ -280,7 +416,8 @@ def main() -> None:
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     runtime.log(event="service_start", host=args.host, port=args.port, allowClient=args.allow_client)
     print(json.dumps({"ready": True, "host": args.host, "port": args.port,
-                      "allowClient": args.allow_client}), flush=True)
+                      "allowClient": args.allow_client,
+                      "codexToken": args.codex_token}), flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
