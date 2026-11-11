@@ -121,11 +121,17 @@ if (-not $hapSignJar) {
 }
 $sigCer = Join-Path $signatureDir "v$Version-cert-chain.cer"
 $sigProfile = Join-Path $signatureDir "v$Version-profile.p7b"
-$verifyOutput = & $JavaExe -jar $hapSignJar.FullName verify `
-  -inputFile $releaseHap `
-  -outcertchain $sigCer `
-  -outprofile $sigProfile 2>&1
-$verifyExit = $LASTEXITCODE
+$previousErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+  $verifyOutput = & $JavaExe -jar $hapSignJar.FullName verify `
+    -inputFile $releaseHap `
+    -outcertchain $sigCer `
+    -outprofile $sigProfile 2>&1
+  $verifyExit = $LASTEXITCODE
+} finally {
+  $ErrorActionPreference = $previousErrorAction
+}
 $verifyText = ($verifyOutput | Out-String)
 $verifyText
 if ($verifyExit -ne 0 -or $verifyText -notmatch 'verify: Verify success') {
