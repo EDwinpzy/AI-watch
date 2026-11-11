@@ -18,13 +18,19 @@
 - 同视口对比：`artifacts/design/aurora-watch-20261111/comparisons/compare-home.png`、
   `compare-record.png`、`compare-vpn.png`、`compare-summary.png`
 - 细节对比：`comparisons/focus-summary-meta.png`、`comparisons/focus-vpn-node.png`
+- 手势复查联系表：
+  `artifacts/design/aurora-watch-20261111/gesture-review/gesture-review-contact-sheet.png`
+- 手势复查原图：`gesture-review/00-home.png`、`02-listening.png`、
+  `03-answer.png`、`04-actions.png`、`05-history.png`、`12-recording.png`、
+  `19b-provider-editor.png`、`21-nodes.png`、`21-nodes-swipe-preview.png`
 
 这些截图是本机验收证据；`artifacts/` 不纳入 Git。
 
 ## Viewport And Normalization
 
-- CSS 视口：466 × 540；圆屏应用面：466 × 466。
-- 实现截图：466 × 540，裁切为 466 × 466，密度 1:1，无缩放。
+- CSS 视口：桌面舞台 466 × 540；圆屏应用面 466 × 466。
+- 手势复查使用 `capture-mode` 的 466 × 466 应用面，截图为 466 × 466，
+  密度 1:1，无缩放；历史全屏证据仍按 466 × 540 裁切。
 - 源图：512 × 512，含表壳与金属边框。对照时裁取圆屏内容
   `(27, 27) – (485, 485)`，即 458 × 458，再等宽缩放到 466 × 466。
 - 状态：默认首页；录音页、实时转写、摘要、生成中和完成态分别截取。
@@ -51,6 +57,17 @@
 
 重点关注区域：摘要双状态标签与两枚元信息、VPN 节点卡和右侧延迟状态。
 
+## Gesture Review
+
+- 使用 DevTools 指针事件实际执行右滑：节点 → VPN、API 配置 → 模型切换、
+  快捷操作 → 回答、回答 → 首页；首页右滑保持不动。
+- 从首页进入模型、从设置进入推荐提问后，右滑均回到实际来源页，
+  而非固定写死的上级页。
+- 字段编辑浮层右滑后回到 API 配置页；保存按钮仍可提交并回显新值。
+- 21 个页面逐一扫描，返回、关闭、取消类按钮数量为 0；历史页右上角
+  的 `+` 是“新建对话”业务动作，不属于导航控件。
+- 滑动过程有轻微右移与降透明反馈，越过约 56 px 后触发返回。
+
 ## Findings
 
 - 无未解决的 P0 / P1 / P2 视觉或可用性问题。
@@ -72,6 +89,9 @@
    贴近圆弧；缩窄对应内容区，并去掉模型页重复的底部入口。
 4. 最终截图确认：无遮挡、无横向溢出，所有主要按钮位于可点击圆弧区域；
    摘要双枚元信息保持单行，第三项完整可见。
+5. 手势复查发现标题旁的返回按钮和两处关闭/取消控件会重复占用圆屏
+   边缘空间；已全部移除，改为右滑逐级返回，并复核聆听、回答、快捷操作、
+   录音、历史、节点和字段编辑浮层。
 
 ## Interactions Tested
 
@@ -81,11 +101,13 @@
 - 模型切换、官方/第三方切换、字段编辑、连接测试、保存
 - VPN 断开/连接、打开节点列表、选择节点并回显
 - 图片生成等待态与结果页、保存提示、设置项循环切换
-- 键盘左右翻页、`Esc` 回首页、表盘区域横向滑动
+- 表盘右滑逐级返回、首页右滑锁定、动态来源页返回、编辑浮层右滑关闭
+- 键盘 `←` / `Esc` 逐级返回、`→` 浏览下一屏
 
 ## Console And Assets
 
 - 浏览器控制台：0 个 error，0 个 warning。
+- 466 × 466 捕获模式截图检查通过，无返回/关闭/取消按钮残留。
 - 最终页面截图中的图片资源均加载完成。
 - `node --check prototypes\aurora-watch\app.js` 通过。
 - 项目结构审计：0 error，0 warning。

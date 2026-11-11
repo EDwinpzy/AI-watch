@@ -189,15 +189,15 @@
     history: "home",
     prompts: "home",
     generating: "prompts",
-    imagegen: "generating",
+    imagegen: "prompts",
     settings: "home",
     more: "settings",
     record: "home",
     recording: "record",
     paused: "record",
-    transcript: "recording",
+    transcript: "record",
     summary: "transcript",
-    finish: "summary",
+    finish: "transcript",
     recordings: "record",
     models: "record",
     provider: "models",
@@ -341,7 +341,9 @@
   let generationTimer = null;
   let toastTimer = null;
   let swipeStart = null;
+  let suppressClickUntil = 0;
   let lastRenderedScreen = "";
+  const returnTargets = new Map();
 
   const icon = (name, extra = "") =>
     `<i class="icon ${extra}" style="--icon:url('vendor/phosphor/icons/${name}.svg')" aria-hidden="true"></i>`;
@@ -397,21 +399,11 @@
     `;
   }
 
-  function backButton(parent, label = "返回") {
-    return `
-      <button class="back-button" type="button" data-nav="${parent}" aria-label="${label}">
-        ${icon("caret-left")}
-      </button>
-    `;
-  }
-
-  function heading(title, parent = "", subtitle = "", extra = "") {
+  function heading(title, extra = "") {
     return `
       <div class="screen-heading">
-        ${parent ? backButton(parent) : ""}
         <h1>${title}</h1>
         ${extra}
-        ${subtitle ? `<span class="heading-subtitle">${subtitle}</span>` : ""}
       </div>
     `;
   }
@@ -520,9 +512,6 @@
           <button class="icon-button voice-stop" type="button" data-action="voice-stop" aria-label="结束聆听并生成回答">
             ${icon("stop")}
           </button>
-          <button class="icon-button voice-mini" type="button" data-nav="home" aria-label="取消对话">
-            ${icon("x")}
-          </button>
         </div>
         <span class="voice-control-label">点击停止并生成回答</span>
       `,
@@ -560,7 +549,6 @@
     return shell(
       `
         <div class="screen-heading">
-          ${backButton("home")}
           <div class="answer-brand">
             <span class="round-icon">${brandIcon(model().brand)}</span>
             <h1>NOVA</h1>
@@ -598,7 +586,7 @@
   function actionsScreen() {
     return shell(
       `
-        ${heading("快捷操作", "answer")}
+        ${heading("快捷操作")}
         <div class="actions-grid">
           <button class="action-item ${state.speaking ? "is-active" : ""}" type="button" data-action="toggle-speak">
             <span class="round-icon">${icon("speaker-high")}</span>
@@ -617,9 +605,6 @@
             <span>${state.feedback === "down" ? "已反馈" : "没帮助"}</span>
           </button>
         </div>
-        <button class="sheet-dismiss" type="button" data-nav="answer" aria-label="关闭快捷操作">
-          ${icon("caret-down")}
-        </button>
       `,
       "actions-screen"
     );
@@ -651,9 +636,7 @@
       `
         ${heading(
           "最近对话",
-          "home",
-          "",
-          `<button class="back-button add-button" type="button" data-action="new-chat" aria-label="新建对话">${icon("plus")}</button>`
+          `<button class="heading-action add-button" type="button" data-action="new-chat" aria-label="新建对话">${icon("plus")}</button>`
         )}
         <div class="screen-scroll">
           <div class="history-topline"><span>3 段对话 · 本周</span><span>长按可删除</span></div>
@@ -692,7 +675,7 @@
 
     return shell(
       `
-        ${heading("推荐提问", "home")}
+        ${heading("推荐提问")}
         <div class="screen-scroll">
           <div class="section-label"><span>常用场景</span><small>点按即问</small></div>
           <div class="prompt-list">
@@ -745,7 +728,7 @@
   function imagegenScreen() {
     return shell(
       `
-        ${heading("帮我生成一张图片", "prompts")}
+        ${heading("帮我生成一张图片")}
         <div class="imagegen-frame">
           <img src="assets/imagegen-sample.png" alt="生成的樱花古塔图片">
           <div class="image-actions">
@@ -794,7 +777,7 @@
 
     return shell(
       `
-        ${heading("设置", "home")}
+        ${heading("设置")}
         <div class="screen-scroll">
           <div class="settings-list">
             ${rows
@@ -822,7 +805,7 @@
   function moreScreen() {
     return shell(
       `
-        ${heading("更多设置", "settings")}
+        ${heading("更多设置")}
         <div class="screen-scroll">
           <div class="settings-list">
             <button class="list-card" type="button" data-nav="models">
@@ -860,7 +843,7 @@
   function recordScreen() {
     return shell(
       `
-        ${heading("录音摘要", "home")}
+        ${heading("录音摘要")}
         <div class="record-model-chip">
           <button class="chip-button model-chip" type="button" data-nav="models">
             ${brandIcon(model().brand)} ${model().chip} ${icon("caret-right")}
@@ -900,7 +883,7 @@
     const clock = clockText(state.recordSeconds);
     return shell(
       `
-        ${heading(paused ? "录音已暂停" : "正在录音", "record")}
+        ${heading(paused ? "录音已暂停" : "正在录音")}
         <span class="recording-subtitle">${paused ? "暂停一下，思绪还在" : "已录制 " + clock + " · 实时转写中"}</span>
         ${paused ? '<span class="paused-badge">PAUSED</span>' : ""}
         <div class="recording-time">
@@ -934,7 +917,7 @@
     const metaTime = clockText(Math.max(state.recordSeconds, 12));
     return shell(
       `
-        ${heading("实时转写", "recording")}
+        ${heading("实时转写")}
         <div class="transcript-meta">
           <span class="record-dot"></span>
           <span>00:02:${pad(Math.min(59, state.recordSeconds + 18))}</span>
@@ -981,7 +964,7 @@
 
     return shell(
       `
-        ${heading("摘要结果", "transcript")}
+        ${heading("摘要结果")}
         <div class="summary-tabs" role="tablist" aria-label="录音内容">
           <button class="summary-tab ${state.summaryTab === "transcript" ? "is-active" : ""}" type="button" role="tab" data-summary-tab="transcript">转写</button>
           <button class="summary-tab ${state.summaryTab === "summary" ? "is-active" : ""}" type="button" role="tab" data-summary-tab="summary">摘要</button>
@@ -1029,7 +1012,7 @@
   function finishScreen() {
     return shell(
       `
-        ${heading("录音总结", "summary")}
+        ${heading("录音总结")}
         <div class="glass-card finish-card">
           <div class="finish-check">${icon("check")}</div>
           <div class="finish-meta">总结已完成 · ChatGPT 网页版</div>
@@ -1086,7 +1069,7 @@
 
     return shell(
       `
-        ${heading("录音历史", "record")}
+        ${heading("录音历史")}
         <div class="screen-scroll">
           <div class="section-label"><span>本周录音</span><small>3 条记录</small></div>
           <div class="list-stack">
@@ -1115,7 +1098,7 @@
   function modelsScreen() {
     return shell(
       `
-        ${heading("模型切换", "record")}
+        ${heading("模型切换")}
         <div class="screen-scroll">
           <div class="model-list">
             ${MODEL_OPTIONS.map((item) => {
@@ -1233,7 +1216,7 @@
 
     return shell(
       `
-        ${heading("API 配置", "models")}
+        ${heading("API 配置")}
         <div class="provider-tabs" role="tablist" aria-label="API 配置类型">
           <button class="provider-tab ${official ? "is-active" : ""}" type="button" data-provider-tab="official">官方</button>
           <button class="provider-tab ${!official ? "is-active" : ""}" type="button" data-provider-tab="third">第三方</button>
@@ -1267,7 +1250,6 @@
         <label for="fieldEditorInput">轻触输入新值</label>
         <input id="fieldEditorInput" name="value" type="${editor.key === "key" ? "password" : "text"}" value="${esc(editor.value)}" autocomplete="off" autocapitalize="off" spellcheck="false">
         <div class="editor-actions">
-          <button type="button" class="secondary-button" data-action="close-editor">取消</button>
           <button type="submit" class="primary-button">保存</button>
         </div>
       </form>
@@ -1278,7 +1260,7 @@
     const activeNode = node();
     return shell(
       `
-        ${heading("VPN", "home")}
+        ${heading("VPN")}
         <div class="vpn-orbit" aria-hidden="true">
           <span class="orbit-ring"></span>
           <span class="orbit-ring"></span>
@@ -1317,7 +1299,7 @@
   function nodesScreen() {
     return shell(
       `
-        ${heading("选择节点", "vpn")}
+        ${heading("选择节点")}
         <div class="screen-scroll">
           <div class="section-label"><span>全球节点</span><small>自动选择最快的线路</small></div>
           <div class="node-list">
@@ -1578,6 +1560,32 @@
     }
   }
 
+  function rememberReturnTarget(target, source = state.screen) {
+    if (target === source || !SCREEN_MAP.has(target) || !SCREEN_MAP.has(source)) return;
+    returnTargets.set(target, source);
+  }
+
+  function parentTarget() {
+    const parent = returnTargets.get(state.screen) || PARENTS[state.screen];
+    return parent && parent !== state.screen && SCREEN_MAP.has(parent) ? parent : "";
+  }
+
+  function closeEditor() {
+    state.editor = null;
+    renderScreen();
+  }
+
+  function goBack() {
+    if (state.editor) {
+      closeEditor();
+      return true;
+    }
+    const parent = parentTarget();
+    if (!parent) return false;
+    navigate(parent);
+    return true;
+  }
+
   function navigate(screenId, options = {}) {
     if (!SCREEN_MAP.has(screenId)) screenId = "home";
     if (!options.preserveFlow) {
@@ -1678,19 +1686,23 @@
   }
 
   function startGeneration(kind) {
+    const returnTarget = state.screen;
     state.generatingKind = kind;
+    rememberReturnTarget("generating", returnTarget);
     clearGenerationTimer();
     navigate("generating");
     generationTimer = window.setTimeout(() => {
       if (state.screen !== "generating") return;
+      if (kind === "image") rememberReturnTarget("imagegen", returnTarget);
       navigate(kind === "image" ? "imagegen" : "finish");
     }, 2300);
   }
 
-  function openAnswer(key) {
+  function openAnswer(key, returnTarget = "home") {
     state.answerKey = key;
     state.speaking = false;
     state.feedback = null;
+    rememberReturnTarget("answer", returnTarget);
     navigate("answer");
   }
 
@@ -1700,7 +1712,7 @@
       return;
     }
     const answerKey = ["travel", "food", "fitness"].includes(promptKey) ? promptKey : "travel";
-    openAnswer(answerKey);
+    openAnswer(answerKey, state.screen);
   }
 
   function openEditor(key) {
@@ -1776,6 +1788,7 @@
     screenEl.addEventListener("click", (event) => {
       const navTarget = event.target.closest("[data-nav]");
       if (navTarget) {
+        rememberReturnTarget(navTarget.dataset.nav);
         navigate(navTarget.dataset.nav);
         return;
       }
@@ -1783,10 +1796,11 @@
       const historyTarget = event.target.closest("[data-history]");
       if (historyTarget) {
         if (historyTarget.dataset.history === "image") {
+          rememberReturnTarget("imagegen");
           navigate("imagegen");
           return;
         }
-        openAnswer(historyTarget.dataset.history === "learn" ? "travel" : historyTarget.dataset.history);
+        openAnswer(historyTarget.dataset.history === "learn" ? "travel" : historyTarget.dataset.history, state.screen);
         return;
       }
 
@@ -1914,10 +1928,11 @@
           copyText(state.summaryTab === "summary" ? summaryText() : transcriptText());
           break;
         case "follow-up":
-          openAnswer("followup");
+          openAnswer("followup", "finish");
           break;
         case "open-record-original":
           state.summaryTab = "transcript";
+          rememberReturnTarget("summary", "finish");
           navigate("summary");
           break;
         case "record-again":
@@ -1954,8 +1969,7 @@
           navigate(state.generatingKind === "image" ? "imagegen" : "finish");
           break;
         case "close-editor":
-          state.editor = null;
-          renderScreen();
+          closeEditor();
           break;
         default:
           break;
@@ -1986,30 +2000,76 @@
   }
 
   function configureGestures() {
+    function resetSwipeVisual() {
+      const appScreen = screenEl.querySelector(".app-screen");
+      const wasDragging = screenEl.classList.contains("is-gesture-dragging");
+      screenEl.classList.remove("is-gesture-dragging");
+      if (wasDragging) screenEl.classList.remove("is-page-enter");
+      if (appScreen) {
+        appScreen.style.removeProperty("--swipe-offset");
+        appScreen.style.removeProperty("--swipe-progress");
+      }
+      swipeStart = null;
+    }
+
+    screenEl.addEventListener(
+      "click",
+      (event) => {
+        if (performance.now() >= suppressClickUntil) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      },
+      true
+    );
+
     screenEl.addEventListener("pointerdown", (event) => {
       if (event.target.closest("input")) return;
+      if (!state.editor && !parentTarget()) return;
       swipeStart = {
         x: event.clientX,
         y: event.clientY,
-        pointerType: event.pointerType
+        pointerId: event.pointerId
       };
+    });
+
+    screenEl.addEventListener("pointermove", (event) => {
+      if (!swipeStart || event.pointerId !== swipeStart.pointerId) return;
+      const dx = event.clientX - swipeStart.x;
+      const dy = event.clientY - swipeStart.y;
+      const horizontal = dx > 0 && dx > Math.abs(dy) * 1.2;
+      if (!horizontal || dx < 8) return;
+      const appScreen = screenEl.querySelector(".app-screen");
+      if (!appScreen) return;
+      if (!screenEl.hasPointerCapture(event.pointerId)) {
+        screenEl.setPointerCapture(event.pointerId);
+      }
+      screenEl.classList.add("is-gesture-dragging");
+      appScreen.style.setProperty("--swipe-offset", `${Math.min(92, dx * 0.64)}px`);
+      appScreen.style.setProperty("--swipe-progress", String(Math.min(1, dx / 110)));
     });
 
     screenEl.addEventListener("pointerup", (event) => {
       if (!swipeStart) return;
       const dx = event.clientX - swipeStart.x;
       const dy = event.clientY - swipeStart.y;
-      const isSwipe = Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.25;
-      swipeStart = null;
-      if (!isSwipe) return;
+      const horizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+      const isBackSwipe = dx > 56 && horizontal;
+      if (horizontal && Math.abs(dx) > 10) {
+        suppressClickUntil = performance.now() + 450;
+      }
+      resetSwipeVisual();
+      if (!isBackSwipe) return;
       event.preventDefault();
-      nextScreen(dx < 0 ? 1 : -1);
+      goBack();
     });
+
+    screenEl.addEventListener("pointercancel", resetSwipeVisual);
 
     window.addEventListener("keydown", (event) => {
       if (["INPUT", "TEXTAREA"].includes(event.target.tagName)) {
         if (event.key === "Escape") {
-          event.target.blur();
+          event.preventDefault();
+          goBack();
         }
         return;
       }
@@ -2019,10 +2079,11 @@
       }
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        nextScreen(-1);
+        goBack();
       }
       if (event.key === "Escape") {
-        navigate("home");
+        event.preventDefault();
+        goBack();
       }
     });
 
