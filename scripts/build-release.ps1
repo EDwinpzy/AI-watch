@@ -121,11 +121,22 @@ if (-not $hapSignJar) {
 }
 $sigCer = Join-Path $signatureDir "v$Version-cert-chain.cer"
 $sigProfile = Join-Path $signatureDir "v$Version-profile.p7b"
-& $JavaExe -jar $hapSignJar.FullName -operation verify `
+$verifyOutput = & $JavaExe -jar $hapSignJar.FullName verify `
   -inputFile $releaseHap `
   -outcertchain $sigCer `
-  -outprofile $sigProfile
-if ($LASTEXITCODE -ne 0) { throw 'HAP signature verification failed' }
+  -outprofile $sigProfile 2>&1
+$verifyExit = $LASTEXITCODE
+$verifyText = ($verifyOutput | Out-String)
+$verifyText
+if ($verifyExit -ne 0 -or $verifyText -notmatch 'verify: Verify success') {
+  throw 'HAP signature verification failed'
+}
+foreach ($proof in @($sigCer, $sigProfile)) {
+  if (-not (Test-Path -LiteralPath $proof) -or
+      (Get-Item -LiteralPath $proof).Length -le 0) {
+    throw "HAP signature proof was not written: $proof"
+  }
+}
 
 $commit = (git -C $root rev-parse HEAD).Trim()
 $report = [ordered]@{
