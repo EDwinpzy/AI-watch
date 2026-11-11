@@ -100,6 +100,8 @@ release 构建、包内容静音检查和 HAP 签名校验。
 - Codex 路由要求 `X-Nova-Token` 或 Bearer Token。
 - 第一版仅 `read-only`，写模式必须使用独立 worktree。
 - HAP、签名材料、音频、任务日志和本地服务日志不纳入 Git。
+- `api8-watch/build-profile.json5` 是忽略的本机文件，只保存生成后的签名配置；
+  仓库仅跟踪无凭据模板，避免证书路径和口令再次入库。
 - 明文 HTTP 只用于可信局域网验证；公网部署必须增加 HTTPS、限流和密钥托管。
 - 当前本机签名证书只生成可安装 HAP，不等同于 AppGallery 正式发布证书。
 

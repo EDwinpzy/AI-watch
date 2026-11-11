@@ -5,6 +5,7 @@ param(
   [string]$NodeExe = '',
   [string]$JavaExe = 'java',
   [string]$OutputDir = '',
+  [string]$SigningConfigPath = '',
   [switch]$AllowDirty,
   [switch]$Force
 )
@@ -14,6 +15,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $apiRoot = Join-Path $root 'api8-watch'
 $appConfig = Join-Path $apiRoot 'AppScope\app.json5'
 $moduleConfig = Join-Path $apiRoot 'entry\src\main\config.json'
+$localBuildProfile = Join-Path $apiRoot 'build-profile.json5'
 $hvigor = Join-Path $apiRoot 'node_modules\@ohos\hvigor\bin\hvigor.js'
 $sourceHap = Join-Path $apiRoot 'entry\build\default\outputs\default\entry-default-signed.hap'
 if (-not $Version) {
@@ -34,6 +36,35 @@ if (-not $OutputDir) {
 }
 if (-not (Test-Path -LiteralPath $hvigor)) {
   throw "Hvigor not found: $hvigor"
+}
+if (-not (Test-Path -LiteralPath $localBuildProfile)) {
+  if (-not $SigningConfigPath) {
+    throw 'Local build-profile.json5 is missing. Run scripts\setup-local-build.ps1 -SigningConfigPath <local signing json>.'
+  }
+  & (Join-Path $PSScriptRoot 'setup-local-build.ps1') `
+    -SigningConfigPath $SigningConfigPath
+  if ($LASTEXITCODE -ne 0) { throw 'Local build profile setup failed.' }
+}
+
+$trackedBuildProfile = @(git -C $root ls-files -- $localBuildProfile)
+if ($trackedBuildProfile.Count -gt 0) {
+  throw 'The local signing build-profile.json5 must not be tracked by Git.'
+}
+$localProfile = Get-Content -LiteralPath $localBuildProfile -Raw | ConvertFrom-Json
+$localSigningConfigs = @($localProfile.app.signingConfigs)
+$productSigningConfig = $localProfile.app.products[0].signingConfig
+if ($localSigningConfigs.Count -eq 0 -or -not $productSigningConfig) {
+  throw 'Release build requires a local signing config. Run scripts\setup-local-build.ps1.'
+}
+$selectedSigning = @($localSigningConfigs | Where-Object name -eq $productSigningConfig)
+if ($selectedSigning.Count -ne 1) {
+  throw "Product signingConfig '$productSigningConfig' does not resolve to one local signing config."
+}
+foreach ($key in @('certpath', 'profile', 'storeFile')) {
+  $materialPath = $selectedSigning[0].material.$key
+  if (-not $materialPath -or -not (Test-Path -LiteralPath $materialPath)) {
+    throw "Local signing material is missing: $key"
+  }
 }
 
 $status = @(git -C $root status --porcelain=v1)

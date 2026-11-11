@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -61,7 +62,14 @@ assert.equal(moduleJson.module.deviceTypes.includes('wearable'), true);
 assert.equal(moduleJson.module.type, 'entry');
 assert.equal(appJson.app.bundleName, 'com.aiwatch.watch');
 assert.equal(appStrings.string[0].value, 'NOVA Watch AI');
-const api8BuildProfile = JSON.parse(read('api8-watch/build-profile.json5'));
+const api8BuildProfilePath = 'api8-watch/build-profile.example.json5';
+const api8BuildProfileText = read(api8BuildProfilePath);
+const api8BuildProfile = JSON.parse(api8BuildProfileText);
+const trackedLocalBuildProfile = execFileSync(
+  'git',
+  ['ls-files', '--', 'api8-watch/build-profile.json5'],
+  { cwd: root, encoding: 'utf8' }
+).trim();
 const api8Config = JSON.parse(read('api8-watch/entry/src/main/config.json'));
 const api8PageSource = read(
   'api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.js'
@@ -77,6 +85,12 @@ const api8EntryHvigorfile = read('api8-watch/entry/hvigorfile.ts');
 
 assert.equal(api8BuildProfile.app.compileSdkVersion, 8, 'API 8 project must compile with SDK 8');
 assert.equal(api8BuildProfile.app.compatibleSdkVersion, 8, 'API 8 project must support API 8');
+assert.equal(trackedLocalBuildProfile, '', 'local signing build-profile must never be tracked');
+assert.deepEqual(api8BuildProfile.app.signingConfigs, [], 'tracked build profile must not contain signing configs');
+assert.ok(
+  !/storePassword|keyPassword|certpath|storeFile/.test(api8BuildProfileText),
+  'tracked build profile template must not contain signing material'
+);
 assert.deepEqual(api8Config.app.apiVersion, { compatible: 8, target: 8 });
 assert.deepEqual(api8Config.module.deviceType, ['wearable']);
 assert.match(api8RootHvigorfile, /export \{\s*legacyAppTasks\s*\}/);
@@ -192,5 +206,5 @@ console.log(JSON.stringify({
   screens: requiredScreens.length,
   builders: requiredBuilders.length,
   rawfiles: rawfileRefs.length,
-  checks: 39
+  checks: 42
 }, null, 2));

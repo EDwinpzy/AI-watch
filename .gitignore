@@ -10,6 +10,7 @@ local.properties
 .secrets/
 local-config.properties
 signing/
+api8-watch/build-profile.json5
 artifacts/
 *.p12
 *.pem

@@ -41,6 +41,10 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 使用 API 8 SDK、Node 14 和工程内 Hvigor：
 
 ```powershell
+$signing='signing\build-profile.signing.json5'
+powershell -ExecutionPolicy Bypass -File scripts\setup-local-build.ps1 `
+  -SigningConfigPath $signing
+
 $sdkBase='C:\Users\63054\AppData\Local\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local'
 $env:OHOS_BASE_SDK_HOME="$sdkBase\OpenHarmony\Sdk"
 $env:HWSDK="$sdkBase\Huawei\Sdk"
@@ -89,6 +93,8 @@ API 8 检查当前为 104 项，包含：
 - 设置页固定静音文案和聊天/录音任务状态。
 
 候选 HAP 与签名材料只保存在本机 `signing/`，不纳入 Git。
+`build-profile.json5` 也由 `build-profile.example.json5` 生成为本机忽略文件；
+不要把签名路径或口令写回仓库模板。
 
 发布候选构建：
 
@@ -126,6 +132,6 @@ SHA-256：72060AC3B444043C883903D0EBEAC5A2D74A0678A1D8121820E58DC51A10C48F
 包内容：44 entries；WAV / MP3 / OGG / AAC / M4A / GIF 均为 0
 ```
 
-该记录只证明本机候选包和当前源码。当前 `build-profile.json5` 使用本机可安装
-签名证书，不等同于 AppGallery 正式发布证书；上架前必须替换为正式证书并重新
-执行完整门禁。
+该记录只证明本机候选包和当前源码。本机生成的 `build-profile.json5` 使用
+可安装调试签名证书，不等同于 AppGallery 正式发布证书；上架前必须替换为
+正式证书并重新执行完整门禁。

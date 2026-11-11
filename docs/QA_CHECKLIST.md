@@ -111,9 +111,10 @@
 - [x] 统一真实 E2E：文字任务 76.67 秒、并发 409、取消、语音创建 2.08 秒均通过。
 - [x] 真实语音转写：“请用一句话介绍人工智能。”
 - [x] `audioUrl` 为空，未生成 TTS 音频或 WAV。
-- [x] `npm run check:source`：39 项通过。
+- [x] `npm run check:source`：42 项通过。
 - [x] `npm run check:core`：14 项通过。
 - [x] `npm run check:api8`：104 项通过。
+- [x] 本机 `build-profile.json5` 未入库，模板不含证书路径或口令。
 - [x] API 8 干净 debug HAP 构建成功。
 - [x] v1.2.1 干净 release 构建与签名校验通过；44 entries，0 音频/GIF。
 - [ ] v1.2.1 真机手势、长轮询、取消、后端切换与圆屏裁切验收。
