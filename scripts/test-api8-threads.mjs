@@ -214,6 +214,7 @@ gesturePage.startVoicePress({ touches: [{ globalX: 300, globalY: 300 }] });
 gesturePage.onVoiceTouchMove({ touches: [{ globalX: 260, globalY: 300 }] });
 assert.equal(gesturePage.voiceActive, false, 'horizontal swipe must cancel capture');
 assert.equal(gesturePage.voiceCta, '按住说话');
+assert.equal(gesturePage.subPage, '', 'left swipe must leave the voice page');
 gesturePage.onVoiceTouchEnd({ changedTouches: [{ globalX: 260, globalY: 300 }] });
 assert.equal(gestureSubmits, 2, 'horizontal swipe release must not submit');
 

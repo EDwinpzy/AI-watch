@@ -551,6 +551,9 @@ export default {
       if (Math.abs(horizontal) >= VOICE_CANCEL_SLIDE_X_PX &&
         Math.abs(horizontal) > Math.abs(upward) * 1.2) {
         this.cancelVoicePress();
+        if (horizontal < 0) {
+          this.closeSubPage();
+        }
         return;
       }
     }
