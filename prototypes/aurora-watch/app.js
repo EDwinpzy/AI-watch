@@ -1,2113 +1,962 @@
 (() => {
   "use strict";
 
-  const screenEl = document.querySelector("#screen");
-  const navEl = document.querySelector("#screenNav");
-  const contextKicker = document.querySelector("#contextKicker");
-  const contextTitle = document.querySelector("#contextTitle");
-  const contextDescription = document.querySelector("#contextDescription");
-  const stateChips = document.querySelector("#stateChips");
-  const globalToast = document.querySelector("#globalToast");
-  const playFlowButton = document.querySelector("#playFlow");
+  const params = new URLSearchParams(window.location.search);
+  const CAPTURE = params.get("capture") === "1";
+  const FREEZE = params.get("freeze") === "1";
+  if (CAPTURE) document.body.classList.add("capture-mode");
+
+  const ICONS = {
+    signal: "cell-signal-high",
+    battery: "battery-high",
+    chat: "chat-circle-dots",
+    waveform: "waveform",
+    mic: "microphone",
+    pause: "pause",
+    bookmark: "bookmark-simple",
+    stop: "stop",
+    check: "check-circle",
+    copy: "copy",
+    arrowRight: "caret-right",
+    terminal: "terminal-window",
+    history: "clock-counter-clockwise",
+    settings: "gear-six",
+    sliders: "sliders-horizontal",
+    file: "file-text",
+    server: "desktop",
+    globe: "globe",
+    cube: "cube",
+    key: "key",
+    shield: "shield-check",
+    haptics: "brain",
+    speakerHigh: "speaker-high",
+    sparkle: "sparkle",
+    robot: "robot",
+    clock: "clock",
+    paperPlane: "paper-plane-tilt",
+  };
 
   const SCREENS = [
-    {
-      id: "home",
-      label: "首页",
-      group: "Talk",
-      kicker: "01 / VOICE FIRST",
-      title: "让思考，轻声发生。",
-      description: "轻触能量球开始对话，或直接进入录音摘要。所有内容都可以在当前圆屏内完成，不用离开手腕。"
-    },
-    {
-      id: "listening",
-      label: "聆听中",
-      group: "Talk",
-      kicker: "02 / LIVE VOICE",
-      title: "说话，它就在听。",
-      description: "低频呼吸环与实时波形共同表达聆听状态。点击停止后将模拟一次完整的语音问答。"
-    },
-    {
-      id: "answer",
-      label: "AI 回答",
-      group: "Talk",
-      kicker: "03 / ANSWER",
-      title: "答案，不大声喧哗。",
-      description: "图文混排、可朗读、可复制。核心信息在腕上保持清晰，长内容允许轻扫阅读。"
-    },
-    {
-      id: "actions",
-      label: "快捷操作",
-      group: "Talk",
-      kicker: "04 / FOLLOW-UP",
-      title: "下一步，就在手边。",
-      description: "朗读、复制、反馈以四个大触控区呈现，适应圆屏边缘与运动中的单手操作。"
-    },
-    {
-      id: "history",
-      label: "对话历史",
-      group: "Talk",
-      kicker: "05 / RECALL",
-      title: "随时回到上一次思路。",
-      description: "最近对话用大尺寸列表呈现，标题优先，元信息退后。点击任一卡片即可继续。"
-    },
-    {
-      id: "prompts",
-      label: "推荐提问",
-      group: "Talk",
-      kicker: "06 / SHORTCUTS",
-      title: "不知道问什么，也没关系。",
-      description: "常用意图被整理成一眼可读的快捷卡片；图片生成也从同一个入口启动。"
-    },
-    {
-      id: "generating",
-      label: "AI 生成中",
-      group: "Create",
-      kicker: "07 / WAITING",
-      title: "等待，也可以很美。",
-      description: "用发光轨道和品牌核心表达处理中状态，不依赖进度条，也不打断表盘的安静感。"
-    },
-    {
-      id: "imagegen",
-      label: "图片生成",
-      group: "Create",
-      kicker: "08 / IMAGE",
-      title: "一张图，刚好放进口袋。",
-      description: "图片是腕上内容的主角。下载与更多操作沉入图片边缘，保持主体完整。"
-    },
-    {
-      id: "settings",
-      label: "应用设置",
-      group: "Create",
-      kicker: "09 / PREFERENCES",
-      title: "按你的习惯，安静一点。",
-      description: "语言、语气与表盘快捷方式都可以快速切换，所有设置保持单列、大字、低认知负担。"
-    },
-    {
-      id: "more",
-      label: "更多设置",
-      group: "Create",
-      kicker: "10 / SYSTEM",
-      title: "复杂能力，收在更深一层。",
-      description: "模型管理、显示与应用信息被收纳在次级页面，不干扰日常语音主路径。"
-    },
-    {
-      id: "record",
-      label: "录音摘要",
-      group: "Record",
-      kicker: "11 / RECORD",
-      title: "灵感来了，先留下。",
-      description: "一个中心入口开始录音，模型与录音历史留在触手可及处。"
-    },
-    {
-      id: "recording",
-      label: "正在录音",
-      group: "Record",
-      kicker: "12 / CAPTURE",
-      title: "此刻，被完整保留。",
-      description: "动态波形、清晰计时与三个核心控制构成录音状态，暂停与结束都只有一步。"
-    },
-    {
-      id: "paused",
-      label: "录音暂停",
-      group: "Record",
-      kicker: "13 / PAUSED",
-      title: "暂停，不打断思路。",
-      description: "波形静止但录音上下文仍在。继续、标记或直接结束，都不需要重新开始。"
-    },
-    {
-      id: "transcript",
-      label: "实时转写",
-      group: "Record",
-      kicker: "14 / TRANSCRIBE",
-      title: "声音，正在变成文字。",
-      description: "实时转写以阅读卡承载，亮色关键词帮助快速扫读，生成摘要只需一次点击。"
-    },
-    {
-      id: "summary",
-      label: "摘要结果",
-      group: "Record",
-      kicker: "15 / DISTILL",
-      title: "重点，不只三条。",
-      description: "摘要与完整转写共享同一空间，用分段标签切换。复制与继续追问保持可见。"
-    },
-    {
-      id: "finish",
-      label: "录音总结",
-      group: "Record",
-      kicker: "16 / COMPLETE",
-      title: "把会议，折叠成一张卡片。",
-      description: "完成态更强调结论与待办，弱化过程信息；查看原文与再次录音保留在底部。"
-    },
-    {
-      id: "recordings",
-      label: "录音历史",
-      group: "Record",
-      kicker: "17 / ARCHIVE",
-      title: "声音，也能被翻回。",
-      description: "录音历史以可播放的大触控卡片呈现，并用日期、时长与摘要状态建立结构。"
-    },
-    {
-      id: "models",
-      label: "模型切换",
-      group: "System",
-      kicker: "18 / MODELS",
-      title: "不同问题，不同大脑。",
-      description: "当前模型拥有唯一高亮边框。其他模型以低对比备用态排列，切换结果即时反馈。"
-    },
-    {
-      id: "provider",
-      label: "API 配置",
-      group: "System",
-      kicker: "19 / PROVIDER",
-      title: "把你的模型，戴在手上。",
-      description: "官方与第三方接口共用一个配置空间。字段可编辑、连接可测试、默认项可切换。"
-    },
-    {
-      id: "vpn",
-      label: "VPN 与节点",
-      group: "System",
-      kicker: "20 / CONNECTION",
-      title: "连接世界，保持安静。",
-      description: "盾牌核心围绕呼吸轨道，节点与延迟成为主信息。连接状态用颜色和文案双重表达。"
-    },
-    {
-      id: "nodes",
-      label: "选择节点",
-      group: "System",
-      kicker: "21 / NODES",
-      title: "更近的路，未必更吵。",
-      description: "节点列表按地区组织，延迟和当前选中状态保持高对比，选择后立即返回 VPN 页面。"
-    }
+    { id: "home", label: "首页", parent: null, meta: ["语音入口", "Codex 就绪"] },
+    { id: "voice", label: "语音对话", parent: "home", meta: ["正在聆听", "16 kHz"] },
+    { id: "answer", label: "语音回答", parent: "home", meta: ["已回答", "语音优先"] },
+    { id: "record", label: "录音任务", parent: "home", meta: ["正在录音", "Codex"] },
+    { id: "running", label: "任务执行", parent: "home", meta: ["运行中", "异步轮询"] },
+    { id: "result", label: "任务结果", parent: "home", meta: ["已完成", "只读模式"] },
+    { id: "history", label: "历史任务", parent: "home", meta: ["最近记录", "可继续"] },
+    { id: "chat", label: "文字对话", parent: "history", meta: ["对话", "本地服务"] },
+    { id: "settings", label: "设置", parent: "home", meta: ["语音后端", "静音"] },
+    { id: "service", label: "服务配置", parent: "settings", meta: ["Magpie", "令牌保护"] },
+    { id: "field", label: "编辑配置", parent: "service", meta: ["单项编辑", "左滑退出"] },
   ];
 
-  const SCREEN_MAP = new Map(SCREENS.map((item) => [item.id, item]));
-  const PARENTS = {
-    listening: "home",
-    answer: "home",
-    actions: "answer",
-    history: "home",
-    prompts: "home",
-    generating: "prompts",
-    imagegen: "prompts",
-    settings: "home",
-    more: "settings",
-    record: "home",
-    recording: "record",
-    paused: "record",
-    transcript: "record",
-    summary: "transcript",
-    finish: "transcript",
-    recordings: "record",
-    models: "record",
-    provider: "models",
-    vpn: "home",
-    nodes: "vpn"
-  };
+  const DEFAULT_TRANSCRIPT =
+    "请检查当前仓库的语音任务桥接，先确认前端保留了哪些页面，再说明下一轮需要验证的后端接口。";
 
-  const MODEL_OPTIONS = [
+  const TASK_FINAL_TEXT =
+    "当前前端已收敛为首页、语音、录音任务、任务状态、结果、历史、聊天、设置和本地服务配置。后端新增只读异步桥接，手表通过任务 ID 轮询并在离开页面后继续执行。下一步应验证超过 60 秒的轮询、取消后无残留子进程，以及 Magpie 不可用时的快速失败。";
+
+  const TASK_POINTS = [
     {
-      id: "gpt4o",
-      name: "GPT-4o",
-      subtitle: "更强的多模态能力",
-      brand: "openai",
-      chip: "GPT-4o"
+      title: "页面范围已收敛",
+      text: "移除 VPN、图片生成、推荐提问和模型商清单，只保留现有语音、摘要、历史与服务设置。",
     },
     {
-      id: "chatgpt",
-      name: "ChatGPT 官方",
-      subtitle: "通用对话模型",
-      brand: "openai",
-      chip: "ChatGPT"
+      title: "Codex 任务改为异步",
+      text: "录音完成后先创建任务，再由手表按 1.5 秒轮询状态，避开 60 秒 fetch 窗口。",
     },
     {
-      id: "claude",
-      name: "Claude API",
-      subtitle: "擅长长文本分析",
-      brand: "anthropic",
-      chip: "Claude"
+      title: "安全边界保持只读",
+      text: "仓库由服务端白名单固定，任务携带访问令牌，取消和超时只结束本任务进程树。",
     },
-    {
-      id: "gemini",
-      name: "Gemini API",
-      subtitle: "多模态与长上下文",
-      brand: "googlegemini",
-      chip: "Gemini"
-    }
   ];
 
-  const NODES = [
+  const HISTORY_SEED = [
     {
-      id: "tokyo",
-      name: "日本 · 东京",
-      secondary: "Asia / Tokyo 01",
-      flag: "jp",
-      ping: "38 ms"
+      id: "task-1",
+      kind: "result",
+      icon: "terminal",
+      title: "检查语音任务桥接",
+      sub: "今天 10:07 · Codex 已完成",
+      tag: "只读",
     },
     {
-      id: "singapore",
-      name: "新加坡",
-      secondary: "Asia / Singapore 02",
-      flag: "sg",
-      ping: "56 ms"
+      id: "chat-1",
+      kind: "chat",
+      icon: "chat",
+      title: "整理今天的工作重点",
+      sub: "昨天 20:14 · 3 条消息",
+      tag: "对话",
     },
     {
-      id: "us",
-      name: "美国 · 西海岸",
-      secondary: "North America / LA 01",
-      flag: "us",
-      ping: "128 ms"
+      id: "task-2",
+      kind: "result",
+      icon: "file",
+      title: "录音摘要与下一步计划",
+      sub: "5 月 18 日 · 2 分 28 秒",
+      tag: "摘要",
     },
-    {
-      id: "de",
-      name: "德国 · 法兰克福",
-      secondary: "Europe / Frankfurt 01",
-      flag: "de",
-      ping: "186 ms"
-    }
   ];
-
-  const ANSWERS = {
-    travel: {
-      user: "帮我推荐一个城市旅行清单。",
-      intro: "当然可以！这是一个关于<strong>城市旅行</strong>的推荐清单，包含景点、美食和小贴士：",
-      travel: true,
-      list: ["推荐景点", "清水寺", "伏见稻荷大社", "岚山竹林"],
-      suffix: "如果时间充裕，建议把第一站安排在清晨，避开人流。"
-    },
-    food: {
-      user: "附近有什么值得吃的小店？",
-      intro: "可以优先试试<strong>步行 10 分钟内</strong>的小店，减少等待，也更容易保持口感：",
-      travel: false,
-      list: ["一碗热汤面", "本地烘焙咖啡", "一个小份甜点"],
-      suffix: "我把距离和营业时间放进了筛选条件，晚一点再给你一份夜间备选。"
-    },
-    fitness: {
-      user: "给我一个今天能完成的健身计划。",
-      intro: "今天用过短而完整的<strong>20 分钟循环</strong>就够了，不需要换装备：",
-      travel: false,
-      list: ["热身 3 分钟", "深蹲 / 俯卧撑 / 平板支撑各 3 组", "慢走 5 分钟收尾"],
-      suffix: "强度保持在你还能说短句的程度。结束后记得补水。"
-    },
-    followup: {
-      user: "把推荐整理得更适合第一次去旅行的人。",
-      intro: "可以，我把路线压缩成<strong>第一次到访也不会紧张</strong>的版本：",
-      travel: true,
-      list: ["先到清水寺", "中午沿二年坂用餐", "傍晚去伏见稻荷"],
-      suffix: "如果你告诉我季节，我还能把穿衣和日落时间一起算进去。"
-    }
-  };
-
-  const CONFIG = {
-    official: {
-      name: "我的 GPT-4o",
-      address: "https://api.openai.com/v1",
-      model: "gpt-4o",
-      protocol: "OpenAI 兼容",
-      key: "sk-proj-••••••••••••••7Qp2"
-    },
-    third: {
-      protocol: "OpenAI 兼容",
-      address: "https://api.example.com/v1",
-      model: "your-model-id",
-      key: "saved ••••••••••",
-      tested: true
-    }
-  };
 
   const state = {
     screen: "home",
-    answerKey: "travel",
-    recordSeconds: 12,
-    recordStatus: "active",
-    summaryTab: "summary",
-    selectedModel: "gpt4o",
-    providerTab: "official",
-    providerTest: "ok",
-    defaultModel: true,
-    vpnConnected: true,
-    node: "tokyo",
-    speaking: false,
-    feedback: null,
-    language: "中文（普通话）",
-    answerStyle: "平衡",
-    editor: null,
-    generatingKind: "image",
-    flowToken: 0
+    toast: "",
+    toastTimer: null,
+    voiceBackend: "Codex",
+    hapticsOn: true,
+    connected: true,
+    resultTab: "summary",
+    provider: {
+      url: "http://192.168.1.129:8787",
+      repo: "watch",
+      model: "translategemma:4b",
+      token: "••••••••••••",
+      codexModel: "commandcode-plan/deepseek-v4.1-flash",
+    },
+    chatMessages: [
+      { role: "user", text: "帮我把今天的任务排个优先级。" },
+      { role: "assistant", text: "先完成影响发布的一项，再集中处理需要沟通的依赖，最后留出 30 分钟复盘。" },
+    ],
+    chatInput: "",
+    record: {
+      seconds: 42,
+      running: true,
+      paused: false,
+      marks: 1,
+      transcript:
+        "我认为接下来可以重点关注用户体验的提升，特别是在语音交互和多模态能力的结合上，可能会带来新的机会……",
+    },
+    task: {
+      status: "idle",
+      taskId: "",
+      transcript: DEFAULT_TRANSCRIPT,
+      startedAt: 0,
+      elapsed: 0,
+      stage: "已排队",
+      message: "等待 Codex 执行",
+      finalText: "",
+    },
+    history: HISTORY_SEED.map((item) => ({ ...item })),
+    field: null,
   };
 
-  let recordTimer = null;
-  let flowTimers = [];
-  let generationTimer = null;
-  let toastTimer = null;
-  let swipeStart = null;
-  let suppressClickUntil = 0;
-  let lastRenderedScreen = "";
-  const returnTargets = new Map();
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const escapeHtml = (value) =>
+    String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
 
-  const icon = (name, extra = "") =>
-    `<i class="icon ${extra}" style="--icon:url('vendor/phosphor/icons/${name}.svg')" aria-hidden="true"></i>`;
+  function icon(name, extra = "") {
+    const fileName = ICONS[name] || name;
+    return `<i class="icon ${extra}" style="--icon:url('vendor/phosphor/icons/${fileName}.svg')" aria-hidden="true"></i>`;
+  }
 
-  const brandIcon = (name, extra = "") =>
-    `<i class="icon ${extra}" style="--icon:url('vendor/simple-icons/${name}.svg')" aria-hidden="true"></i>`;
-
-  const esc = (value) =>
-    String(value).replace(/[&<>"']/g, (character) => {
-      const entityMap = {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-      };
-      return entityMap[character];
-    });
-
-  const model = () => MODEL_OPTIONS.find((item) => item.id === state.selectedModel) || MODEL_OPTIONS[0];
-  const node = () => NODES.find((item) => item.id === state.node) || NODES[0];
-  const answer = () => ANSWERS[state.answerKey] || ANSWERS.travel;
+  function openAiIcon(extra = "") {
+    return `<i class="icon ${extra}" style="--icon:url('vendor/simple-icons/openai.svg')" aria-hidden="true"></i>`;
+  }
 
   function pad(value) {
-    return String(value).padStart(2, "0");
+    return value < 10 ? `0${value}` : String(value);
   }
 
-  function currentClock() {
-    const now = new Date();
-    return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  function timerText(seconds) {
+    return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
   }
 
-  function currentDate() {
-    const now = new Date();
-    const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-    return `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`;
+  function modelLabel(model) {
+    const id = String(model || "");
+    if (id.includes("deepseek")) return "DeepSeek V4.1 Flash";
+    return id.split("/").pop() || id;
   }
 
-  function clockText(totalSeconds) {
-    return `${pad(Math.floor(totalSeconds / 60))}:${pad(totalSeconds % 60)}`;
+  function screenMeta(id) {
+    return SCREENS.find((item) => item.id === id) || SCREENS[0];
   }
 
-  function statusbar() {
+  function statusBar({ home = false } = {}) {
+    if (home) {
+      return `
+        <div class="statusbar is-home">
+          <div class="status-clock"><strong>10:09</strong></div>
+        </div>`;
+    }
     return `
       <div class="statusbar">
-        <div class="status-left">${icon("cell-signal-high")}</div>
-        <div class="status-clock">
-          <strong class="js-clock">${currentClock()}</strong>
-          <span class="js-date">${currentDate()}</span>
-        </div>
-        <div class="status-right"><span>80%</span>${icon("battery-high")}</div>
-      </div>
-    `;
+        <div class="status-left">${icon("signal")}</div>
+        <div class="status-clock"><strong>10:08</strong><span>5月20日 周二</span></div>
+        <div class="status-right">${icon("battery")}<span>80%</span></div>
+      </div>`;
   }
 
-  function heading(title, extra = "") {
-    return `
-      <div class="screen-heading">
-        <h1>${title}</h1>
-        ${extra}
-      </div>
-    `;
+  function roundToast() {
+    return `<div class="round-toast ${state.toast ? "is-visible" : ""}" role="status">${escapeHtml(state.toast)}</div>`;
   }
 
-  function shell(content, pageClass = "") {
-    return `
-      <div class="app-screen ${pageClass}">
-        <div class="screen-fx" aria-hidden="true"></div>
-        ${statusbar()}
-        ${content}
-        <div class="inner-toast" data-inner-toast role="status" aria-live="polite"></div>
-      </div>
-    `;
+  function showToast(message) {
+    state.toast = message;
+    clearTimeout(state.toastTimer);
+    const existing = $(".round-toast");
+    if (existing) {
+      existing.textContent = message;
+      existing.classList.add("is-visible");
+    } else {
+      render();
+    }
+    state.toastTimer = window.setTimeout(() => {
+      state.toast = "";
+      const toast = $(".round-toast");
+      if (toast) toast.classList.remove("is-visible");
+    }, 1800);
   }
 
-  function voiceBars(count = 23, spread = 19) {
+  function waveBars(count = 70) {
     return Array.from({ length: count }, (_, index) => {
-      const height = 4 + ((index * 7 + Math.round(spread * 0.7)) % spread);
-      return `<i style="height:${height}px;--delay:${(index % 9) * 0.07}s"></i>`;
+      const center = Math.abs(index - (count - 1) / 2) / ((count - 1) / 2);
+      const height = 8 + Math.round((1 - center) * 46 + Math.abs(Math.sin(index * 1.71)) * 17);
+      const delay = `${(index % 9) * 0.06}s`;
+      return `<i style="height:${height}px;animation-delay:${delay}"></i>`;
     }).join("");
-  }
-
-  function recordingBars(count = 47) {
-    return Array.from({ length: count }, (_, index) => {
-      const centerBias = 1 - Math.abs(index - (count - 1) / 2) / (count / 2);
-      const base = 10 + Math.round(centerBias * 45);
-      const variation = ((index * 13) % 31) - 12;
-      const height = Math.max(8, Math.min(74, base + variation));
-      const speed = 0.55 + (index % 7) * 0.06;
-      return `<i style="--h:${height}px;--speed:${speed}s;--delay:${(index % 11) * 0.045}s"></i>`;
-    }).join("");
-  }
-
-  function flagsMarkup(item) {
-    return `<span class="flag"><img src="vendor/flags/${item.flag}.svg" alt=""></span>`;
   }
 
   function homeScreen() {
-    const activeModel = model();
-    const activeNode = node();
-    return shell(
-      `
-        <div class="home-chips">
-          <button type="button" class="chip-button ${state.vpnConnected ? "accent" : ""}" data-nav="vpn">
-            <span class="online-dot"></span>
-            ${state.vpnConnected ? "VPN 已连接" : "VPN 未连接"}
+    const taskChip =
+      state.task.status === "running"
+        ? `<button class="soft-chip is-dim home-task" data-nav="running">${icon("terminal")} Codex 执行中 · ${timerText(state.task.elapsed)}</button>`
+        : state.task.status === "succeeded"
+          ? `<button class="soft-chip is-dim home-task" data-nav="result">${icon("check")} 最近任务已完成</button>`
+          : "";
+    return `
+      <div class="app-screen home-screen">
+        ${statusBar({ home: true })}
+        <button class="home-orb" data-action="start-voice" aria-label="开始语音对话"><img src="assets/home-orb.png" alt=""></button>
+        <div class="home-wordmark">ChatGPT</div>
+        ${taskChip}
+        <div class="home-actions">
+          <button class="hero-action hero-action-primary" data-action="start-voice">
+            ${icon("chat")}<span>开始对话</span>
           </button>
-          <button type="button" class="chip-button model-chip" data-nav="models">
-            ${brandIcon(activeModel.brand)}
-            ${activeModel.chip}
-            ${icon("caret-right")}
-          </button>
-        </div>
-
-        <div class="hero-orb-wrap" aria-hidden="true">
-          <span class="orb-ring"></span>
-          <img class="hero-orb" src="assets/home-orb.png" alt="">
-        </div>
-
-        <div class="home-brand">
-          <strong>NOVA</strong>
-          <span>PERSONAL AI · READY</span>
-        </div>
-
-        <div class="home-main-actions">
-          <button class="home-action home-action-chat" type="button" data-action="start-voice">
-            ${icon("chat-circle-dots")}
-            <span>开始对话</span>
-          </button>
-          <button class="home-action home-action-record" type="button" data-nav="record">
-            ${icon("waveform")}
-            <span>录音摘要</span>
+          <button class="hero-action hero-action-secondary" data-action="start-codex">
+            ${icon("waveform")}<span>录音摘要</span>
           </button>
         </div>
-        <div class="home-scroll-hint">${activeNode.name} · ${activeNode.ping} · 轻触开始</div>
-      `,
-      "home-screen home-status"
-    );
+      </div>`;
   }
 
-  function listeningScreen() {
-    return shell(
-      `
-        <div class="listening-title">
-          <h1>正在聆听</h1>
-          <p>${model().chip} · 语音对话</p>
+  function voiceScreen() {
+    return `
+      <div class="app-screen voice-screen">
+        ${statusBar()}
+        <div class="voice-chips">
+          <span class="soft-chip">${openAiIcon()} ${escapeHtml(state.voiceBackend)} · 只读</span>
         </div>
-
-        <div class="voice-visual">
-          <span class="voice-ring r1"></span>
-          <span class="voice-ring r2"></span>
-          <span class="voice-ring r3"></span>
-          <div class="voice-core">${icon("microphone")}</div>
-          <div class="voice-wave-mini" aria-hidden="true">${voiceBars(25, 23)}</div>
-        </div>
-
-        <div class="listening-caption">
-          <strong>LIVE</strong>
-          “帮我安排一个适合周末的城市旅行。”
-        </div>
-
-        <div class="listening-controls">
-          <button class="icon-button voice-mini" type="button" data-action="toggle-speaker" aria-label="切换语音播报">
-            ${icon("speaker-high")}
+        <button class="voice-hero" data-action="finish-voice" aria-label="完成本次语音输入">
+          <span class="voice-core">${icon("mic")}<span>按住说话</span></span>
+        </button>
+        <div class="voice-live-label"><i></i>正在聆听</div>
+        <div class="voice-hub-actions">
+          <button class="voice-hub-row" data-action="start-codex">
+            <span class="voice-hub-icon">${icon("file")}</span>
+            <span class="row-copy"><strong>录音摘要</strong><small>会议记录 · Codex 任务</small></span>
+            ${icon("arrowRight", "row-chevron")}
           </button>
-          <button class="icon-button voice-stop" type="button" data-action="voice-stop" aria-label="结束聆听并生成回答">
-            ${icon("stop")}
+          <button class="voice-hub-row" data-nav="chat">
+            <span class="voice-hub-icon is-blue">${icon("chat")}</span>
+            <span class="row-copy"><strong>文字对话</strong><small>继续输入 · 本地服务</small></span>
+            ${icon("arrowRight", "row-chevron")}
           </button>
         </div>
-        <span class="voice-control-label">点击停止并生成回答</span>
-      `,
-      "listening-screen"
-    );
+        <div class="voice-footer-hint"><b>‹</b><span>左滑收起 · 手表全程静音</span></div>
+        ${roundToast()}
+      </div>`;
   }
 
   function answerScreen() {
-    const currentAnswer = answer();
-    const card = currentAnswer.travel
-      ? `
-        <div class="glass-card travel-card">
-          <div class="travel-image">
-            <img src="assets/travel-thumb.png" alt="京都旅行参考图">
-          </div>
-          <div class="travel-list">
-            <strong>${currentAnswer.list[0]}</strong>
-            <ul>
-              ${currentAnswer.list.slice(1).map((item) => `<li>${esc(item)}</li>`).join("")}
-            </ul>
-          </div>
+    return `
+      <div class="app-screen answer-screen">
+        ${statusBar()}
+        <div class="screen-title">语音回答</div>
+        <div class="scroll-area no-head">
+          <div class="answer-bubble user"><small>你</small><p>检查一下当前 Codex 任务的完成情况。</p></div>
+          <div class="answer-bubble"><small>ChatGPT</small><p>任务已完成。前端页面已经收敛，后台会在任务注册表中保留结果；现在可以复制回答，或继续追问具体模块。</p></div>
         </div>
-      `
-      : `
-        <div class="glass-card travel-card" style="display:block;padding:14px 15px;">
-          <div class="travel-list" style="padding:0;">
-            <strong>${esc(currentAnswer.list[0])}</strong>
-            <ul>
-              ${currentAnswer.list.slice(1).map((item) => `<li>${esc(item)}</li>`).join("")}
-            </ul>
-          </div>
-        </div>
-      `;
-
-    return shell(
-      `
-        <div class="screen-heading">
-          <div class="answer-brand">
-            <span class="round-icon">${brandIcon(model().brand)}</span>
-            <h1>NOVA</h1>
-          </div>
-        </div>
-
-        <div class="screen-scroll answer-scroll">
-          <div class="user-bubble">${esc(currentAnswer.user)}</div>
-          <p class="assistant-copy">${currentAnswer.intro}</p>
-          ${card}
-          <p class="assistant-copy" style="margin-top:12px;color:#9fb4b5;font-size:12px;line-height:1.65;">
-            ${esc(currentAnswer.suffix)}
-          </p>
-        </div>
-
         <div class="answer-footer">
-          <button class="icon-button ${state.speaking ? "is-active" : ""}" type="button" data-action="toggle-speak" aria-label="朗读回答">
-            ${icon("speaker-high")}
-          </button>
-          <button class="icon-button" type="button" data-action="copy-answer" aria-label="复制回答">
-            ${icon("copy")}
-          </button>
-          <button class="icon-button ${state.feedback === "up" ? "is-active" : ""}" type="button" data-action="feedback-up" aria-label="有帮助">
-            ${icon("thumbs-up")}
-          </button>
-          <button class="more-button" type="button" data-nav="actions" aria-label="更多操作">
-            ${icon("caret-up")}
-          </button>
+          <button class="secondary-pill" data-action="copy-voice">${icon("copy")}复制回答</button>
+          <button class="primary-pill" data-action="continue-voice">${icon("chat")}继续追问</button>
         </div>
-      `,
-      "answer-screen"
-    );
-  }
-
-  function actionsScreen() {
-    return shell(
-      `
-        ${heading("快捷操作")}
-        <div class="actions-grid">
-          <button class="action-item ${state.speaking ? "is-active" : ""}" type="button" data-action="toggle-speak">
-            <span class="round-icon">${icon("speaker-high")}</span>
-            <span>${state.speaking ? "停止朗读" : "朗读回答"}</span>
-          </button>
-          <button class="action-item" type="button" data-action="copy-answer">
-            <span class="round-icon">${icon("copy")}</span>
-            <span>复制内容</span>
-          </button>
-          <button class="action-item ${state.feedback === "up" ? "is-active" : ""}" type="button" data-action="feedback-up">
-            <span class="round-icon">${icon("thumbs-up")}</span>
-            <span>${state.feedback === "up" ? "已反馈" : "有帮助"}</span>
-          </button>
-          <button class="action-item ${state.feedback === "down" ? "is-active" : ""}" type="button" data-action="feedback-down">
-            <span class="round-icon">${icon("thumbs-down")}</span>
-            <span>${state.feedback === "down" ? "已反馈" : "没帮助"}</span>
-          </button>
-        </div>
-      `,
-      "actions-screen"
-    );
-  }
-
-  function historyScreen() {
-    const items = [
-      {
-        key: "travel",
-        title: "日本旅行推荐",
-        subtitle: "今天 09:28 · 4 条消息",
-        icon: "chat-circle-dots"
-      },
-      {
-        key: "image",
-        title: "帮我生成一张图片",
-        subtitle: "昨天 20:14 · 3 条消息",
-        icon: "image"
-      },
-      {
-        key: "learn",
-        title: "解释一下量子计算",
-        subtitle: "10月16日 16:20 · 5 条消息",
-        icon: "code"
-      }
-    ];
-
-    return shell(
-      `
-        ${heading(
-          "最近对话",
-          `<button class="heading-action add-button" type="button" data-action="new-chat" aria-label="新建对话">${icon("plus")}</button>`
-        )}
-        <div class="screen-scroll">
-          <div class="history-topline"><span>3 段对话 · 本周</span><span>长按可删除</span></div>
-          <div class="list-stack">
-            ${items
-              .map(
-                (item) => `
-                  <button class="list-card" type="button" data-history="${item.key}">
-                    <span class="list-icon history-row-icon">${icon(item.icon)}</span>
-                    <span class="list-copy">
-                      <span class="list-title">${item.title}</span>
-                      <span class="list-sub">${item.subtitle}</span>
-                    </span>
-                    ${icon("caret-right", "list-chevron")}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          <button class="new-chat-button" type="button" data-action="new-chat">
-            说句话，开始新的对话
-          </button>
-        </div>
-      `,
-      "history-screen"
-    );
-  }
-
-  function promptsScreen() {
-    const prompts = [
-      { key: "travel", title: "制定旅行计划", subtitle: "路线、景点和小贴士", icon: "paper-plane-tilt" },
-      { key: "food", title: "推荐附近美食", subtitle: "按距离和营业时间筛选", icon: "fork-knife" },
-      { key: "fitness", title: "健身计划", subtitle: "短时、可坚持、不需要器械", icon: "barbell" },
-      { key: "image", title: "帮我生成一张图片", subtitle: "从一句描述开始创作", icon: "image" }
-    ];
-
-    return shell(
-      `
-        ${heading("推荐提问")}
-        <div class="screen-scroll">
-          <div class="section-label"><span>常用场景</span><small>点按即问</small></div>
-          <div class="prompt-list">
-            ${prompts
-              .map(
-                (item) => `
-                  <button class="prompt-card" type="button" data-prompt="${item.key}">
-                    <span class="round-icon">${icon(item.icon)}</span>
-                    <span class="list-copy">
-                      <strong>${item.title}</strong>
-                      <small>${item.subtitle}</small>
-                    </span>
-                    ${icon("caret-right", "list-chevron")}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-        </div>
-        <button class="chip-button prompt-cta" type="button" data-nav="listening">
-          ${icon("microphone")} 或者直接说
-        </button>
-      `,
-      "prompts-screen"
-    );
-  }
-
-  function generatingScreen() {
-    const isImage = state.generatingKind === "image";
-    return shell(
-      `
-        <div class="generation-visual">
-          <span class="gen-orbit"></span>
-          <span class="gen-orbit inner"></span>
-          <button class="gen-core" type="button" data-action="generation-result" aria-label="查看生成结果">
-            ${brandIcon("openai")}
-          </button>
-        </div>
-        <div class="generation-copy">
-          <h1>${isImage ? "AI 正在生成图片" : "AI 正在生成摘要"}</h1>
-          <p>${isImage ? "把描述变成一张腕上作品" : "正在提炼重点与下一步"}</p>
-          <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        </div>
-        <div class="generation-dots" aria-hidden="true"><i></i><i></i><i></i></div>
-      `,
-      "generating-screen"
-    );
-  }
-
-  function imagegenScreen() {
-    return shell(
-      `
-        ${heading("帮我生成一张图片")}
-        <div class="imagegen-frame">
-          <img src="assets/imagegen-sample.png" alt="生成的樱花古塔图片">
-          <div class="image-actions">
-            <button class="icon-button" type="button" data-action="download-image" aria-label="下载图片">
-              ${icon("download-simple")}
-            </button>
-            <button class="icon-button" type="button" data-action="image-more" aria-label="图片更多操作">
-              ${icon("dots-three")}
-            </button>
-          </div>
-        </div>
-        <span class="imagegen-caption">古塔、樱花与黄昏 · NOVA 图像模型</span>
-        <div class="imagegen-dots" aria-hidden="true"><i></i><i></i><i></i></div>
-      `,
-      "imagegen-screen"
-    );
-  }
-
-  function settingsScreen() {
-    const rows = [
-      {
-        action: "cycle-language",
-        icon: "translate",
-        title: "语音语言",
-        subtitle: state.language
-      },
-      {
-        action: "cycle-style",
-        icon: "paint-brush",
-        title: "回答风格",
-        subtitle: state.answerStyle
-      },
-      {
-        nav: "prompts",
-        icon: "sliders-horizontal",
-        title: "表盘快捷方式",
-        subtitle: "当前：推荐提问"
-      },
-      {
-        nav: "more",
-        icon: "info",
-        title: "更多设置",
-        subtitle: "模型、显示与关于"
-      }
-    ];
-
-    return shell(
-      `
-        ${heading("设置")}
-        <div class="screen-scroll">
-          <div class="settings-list">
-            ${rows
-              .map(
-                (row) => `
-                  <button class="list-card" type="button" ${row.nav ? `data-nav="${row.nav}"` : `data-action="${row.action}"`}>
-                    <span class="list-icon">${icon(row.icon)}</span>
-                    <span class="list-copy">
-                      <span class="list-title">${row.title}</span>
-                      <span class="list-sub">${row.subtitle}</span>
-                    </span>
-                    ${icon("caret-right", "list-chevron")}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          <p class="settings-footnote">NOVA Watch AI · Aurora build 0.4</p>
-        </div>
-      `,
-      "settings-screen"
-    );
-  }
-
-  function moreScreen() {
-    return shell(
-      `
-        ${heading("更多设置")}
-        <div class="screen-scroll">
-          <div class="settings-list">
-            <button class="list-card" type="button" data-nav="models">
-              <span class="list-icon">${icon("cube")}</span>
-              <span class="list-copy">
-                <span class="list-title">模型管理</span>
-                <span class="list-sub">添加与管理 AI 模型</span>
-              </span>
-              ${icon("caret-right", "list-chevron")}
-            </button>
-            <button class="list-card" type="button" data-action="display-settings">
-              <span class="list-icon">${icon("sun-horizon")}</span>
-              <span class="list-copy">
-                <span class="list-title">界面与显示</span>
-                <span class="list-sub">亮度 · 主题 · 常亮时间</span>
-              </span>
-              ${icon("caret-right", "list-chevron")}
-            </button>
-            <button class="list-card" type="button" data-action="about-app">
-              <span class="list-icon">${icon("info")}</span>
-              <span class="list-copy">
-                <span class="list-title">关于应用</span>
-                <span class="list-sub">版本 1.0.0 · 设计原型</span>
-              </span>
-              ${icon("caret-right", "list-chevron")}
-            </button>
-          </div>
-          <p class="settings-footnote">敏感配置仅保存在本机安全存储</p>
-        </div>
-      `,
-      "settings-screen more-screen"
-    );
+        ${roundToast()}
+      </div>`;
   }
 
   function recordScreen() {
-    return shell(
-      `
-        ${heading("录音摘要")}
-        <div class="record-model-chip">
-          <button class="chip-button model-chip" type="button" data-nav="models">
-            ${brandIcon(model().brand)} ${model().chip} ${icon("caret-right")}
-          </button>
-        </div>
-        <div class="earth-horizon" aria-hidden="true"></div>
-        <button class="record-hub" type="button" data-action="start-recording" aria-label="开始录音">
-          ${icon("microphone")}
-          <strong>开始录音</strong>
-          <span>点按后自动开始转写</span>
-        </button>
-        <div class="record-hub-actions">
-          <button class="list-card" type="button" data-nav="recordings">
-            <span class="list-icon">${icon("file-text")}</span>
-            <span class="list-copy">
-              <span class="list-title">录音摘要</span>
-              <span class="list-sub">会议记录 · AI 总结</span>
-            </span>
-            ${icon("caret-right", "list-chevron")}
-          </button>
-          <button class="list-card" type="button" data-nav="models">
-            <span class="list-icon">${icon("cube")}</span>
-            <span class="list-copy">
-              <span class="list-title">模型切换</span>
-              <span class="list-sub">${model().chip} · 更多模型</span>
-            </span>
-            ${icon("caret-right", "list-chevron")}
-          </button>
-        </div>
-        <span class="record-hub-scroll">轻扫查看更多</span>
-      `,
-      "record-screen"
-    );
-  }
-
-  function recordingScreen(paused = false) {
-    const clock = clockText(state.recordSeconds);
-    return shell(
-      `
-        ${heading(paused ? "录音已暂停" : "正在录音")}
-        <span class="recording-subtitle">${paused ? "暂停一下，思绪还在" : "已录制 " + clock + " · 实时转写中"}</span>
-        ${paused ? '<span class="paused-badge">PAUSED</span>' : ""}
-        <div class="recording-time">
-          <span class="js-record-clock">${clock}</span>
-          <small>${model().chip} · 16 kHz</small>
-        </div>
-        <div class="recording-wave-wrap">
-          <div class="wave-bars" aria-label="录音波形">${recordingBars()}</div>
-        </div>
-        <div class="recording-controls">
-          <button class="record-control" type="button" data-action="mark-recording" aria-label="标记片段">
-            <span class="icon-btn">${icon("bookmark-simple")}</span>
-            <span>标记</span>
-          </button>
-          <button class="record-control large" type="button" data-action="${paused ? "resume-recording" : "pause-recording"}" aria-label="${paused ? "继续录音" : "暂停录音"}">
-            <span class="icon-btn">${paused ? icon("play") : icon("pause")}</span>
-            <span>${paused ? "继续" : "暂停"}</span>
-          </button>
-          <button class="record-control stop" type="button" data-action="stop-recording" aria-label="结束录音">
-            <span class="icon-btn">${icon("square")}</span>
-            <span>结束</span>
-          </button>
-        </div>
-        <span class="recording-tip">${paused ? "继续录音不会覆盖已录制内容" : "结束后自动转写并发送给模型"}</span>
-      `,
-      `recording-screen ${paused ? "is-paused" : ""}`
-    );
-  }
-
-  function transcriptScreen() {
-    const metaTime = clockText(Math.max(state.recordSeconds, 12));
-    return shell(
-      `
-        ${heading("实时转写")}
-        <div class="transcript-meta">
-          <span class="record-dot"></span>
-          <span>00:02:${pad(Math.min(59, state.recordSeconds + 18))}</span>
-          <span>· 正在实时转写</span>
-        </div>
-        <div class="glass-card transcript-card">
-          <div class="transcript-time">${metaTime} · 语音片段 03</div>
-          <p class="transcript-body">
-            我们本次会议主要讨论了<mark class="highlight">产品的未来规划</mark>，包括功能优化、用户体验提升以及下一个版本的发布时间。下一步会先完成核心功能与体验验证，再确定上线日期。
-          </p>
-          <div class="transcript-typing">
-            <span class="wave-mini" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-            正在实时转写
-          </div>
-        </div>
-        <div class="transcript-actions">
-          <button class="primary-button" type="button" data-action="make-summary">
-            生成摘要 ${icon("arrow-right")}
-          </button>
-          <button class="icon-button" type="button" data-action="copy-transcript" aria-label="复制转写">
-            ${icon("copy")}
-          </button>
-        </div>
-      `,
-      "transcript-screen"
-    );
-  }
-
-  function summaryScreen() {
-    const points = [
-      {
-        title: "产品定位与核心目标",
-        text: "聚焦 AI 助手的日常场景落地，提升用户效率与使用体验。"
-      },
-      {
-        title: "关键功能与技术方案",
-        text: "确定语音交互、多模态能力和云端大模型的集成方案。"
-      },
-      {
-        title: "下一步行动计划",
-        text: "完成原型设计并开展用户测试，收集反馈后迭代优化。"
-      }
-    ];
-
-    return shell(
-      `
-        ${heading("摘要结果")}
-        <div class="summary-tabs" role="tablist" aria-label="录音内容">
-          <button class="summary-tab ${state.summaryTab === "transcript" ? "is-active" : ""}" type="button" role="tab" data-summary-tab="transcript">转写</button>
-          <button class="summary-tab ${state.summaryTab === "summary" ? "is-active" : ""}" type="button" role="tab" data-summary-tab="summary">摘要</button>
-        </div>
-        <div class="summary-meta">
-          <span class="chip-button">${icon("check-circle")} 已转写 · 12分28秒</span>
-          <span class="chip-button accent">${brandIcon(model().brand)} 已发送 ${model().chip}</span>
-        </div>
-        <div class="summary-points ${state.summaryTab === "transcript" ? "summary-scroll" : ""}">
-          ${
-            state.summaryTab === "transcript"
-              ? `
-                <div class="long-transcript">
-                  <p>本次会议主要围绕产品未来规划展开讨论，明确了<mark>功能优化方向</mark>、用户体验提升方案，以及下一个版本的发布时间和具体任务分工。</p>
-                  <p>首先，我们确认新版会继续以语音作为主入口，同时保留图文混排和大屏阅读能力。其次，设计团队需要在周三前完成交互原型，开发团队同步验证动效性能。</p>
-                  <p>最后，计划在周五进行首次用户测试，重点关注圆屏阅读、单手操作和录音摘要的信任感。</p>
-                </div>
-              `
-              : points
-                  .map(
-                    (point, index) => `
-                      <section class="summary-point">
-                        <span class="point-number">${index + 1}</span>
-                        <h3>${point.title}</h3>
-                        <p>${point.text}</p>
-                      </section>
-                    `
-                  )
-                  .join("")
-          }
-        </div>
-        <div class="summary-actions">
-          <button class="secondary-button" type="button" data-action="copy-summary">
-            ${icon("copy")} 复制
-          </button>
-          <button class="primary-button" type="button" data-action="follow-up">
-            ${icon("chat-circle-dots")} 继续追问
-          </button>
-        </div>
-      `,
-      "summary-screen"
-    );
-  }
-
-  function finishScreen() {
-    return shell(
-      `
-        ${heading("录音总结")}
-        <div class="glass-card finish-card">
-          <div class="finish-check">${icon("check")}</div>
-          <div class="finish-meta">总结已完成 · ChatGPT 网页版</div>
-
-          <section class="finish-section">
-            <div class="finish-section-title"><i></i>核心结论</div>
-            <p>先完成核心功能与体验验证，再确定上线日期。</p>
-          </section>
-
-          <section class="finish-section">
-            <div class="finish-section-title"><i></i>待办事项</div>
-            <ul class="finish-todo">
-              <li>整理需求清单</li>
-              <li>安排体验测试</li>
-            </ul>
-          </section>
-
-          <button class="finish-original" type="button" data-action="open-record-original">
-            ${icon("file-text")} 查看原文 ${icon("caret-right", "list-chevron")}
-          </button>
-        </div>
-        <div class="finish-actions">
-          <button class="primary-button" type="button" data-action="record-again">
-            ${icon("microphone")} 再录一段
-          </button>
-          <span>录音文本已自动发送至当前模型生成总结</span>
-        </div>
-      `,
-      "finish-screen"
-    );
-  }
-
-  function recordingsScreen() {
-    const recordings = [
-      {
-        title: "产品需求评审会议",
-        date: "5月20日 14:30",
-        duration: "32:18",
-        icon: "file-text"
-      },
-      {
-        title: "周例会讨论",
-        date: "5月19日 10:12",
-        duration: "28:45",
-        icon: "chat-circle-dots"
-      },
-      {
-        title: "用户访谈记录",
-        date: "5月18日 16:20",
-        duration: "18:03",
-        icon: "user-circle"
-      }
-    ];
-
-    return shell(
-      `
-        ${heading("录音历史")}
-        <div class="screen-scroll">
-          <div class="section-label"><span>本周录音</span><small>3 条记录</small></div>
-          <div class="list-stack">
-            ${recordings
-              .map(
-                (item, index) => `
-                  <button class="list-card recording-card" type="button" data-action="recording-play" data-recording="${index}">
-                    <span class="list-icon play-button">${icon("play")}</span>
-                    <span class="list-copy">
-                      <span class="list-title">${item.title}</span>
-                      <span class="recording-card-meta">${item.date}<i></i>${item.duration}<i></i>已摘要</span>
-                    </span>
-                    ${icon("caret-right", "list-chevron")}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          <p class="settings-footnote">音频仅本机保存 · 点击可预览播放</p>
-        </div>
-      `,
-      "recordings-screen"
-    );
-  }
-
-  function modelsScreen() {
-    return shell(
-      `
-        ${heading("模型切换")}
-        <div class="screen-scroll">
-          <div class="model-list">
-            ${MODEL_OPTIONS.map((item) => {
-              const selected = item.id === state.selectedModel;
-              return `
-                <button class="list-card model-card ${selected ? "is-selected" : ""}" type="button" data-model="${item.id}">
-                  <span class="list-icon model-brand-icon">${brandIcon(item.brand)}</span>
-                  <span class="list-copy">
-                    <span class="list-title">${item.name}</span>
-                    <span class="list-sub">${item.subtitle}</span>
-                  </span>
-                  ${
-                    selected
-                      ? `<span class="model-check">${icon("check")}</span>`
-                      : `<span class="status-tag">备用</span>`
-                  }
-                </button>
-              `;
-            }).join("")}
-          </div>
-        </div>
-        <button class="models-footer" type="button" data-nav="provider">
-          ${icon("caret-up")} 长按编辑配置
-        </button>
-      `,
-      "models-screen"
-    );
-  }
-
-  function providerScreen() {
-    const official = state.providerTab === "official";
-    const config = official ? CONFIG.official : CONFIG.third;
-    const testLabel =
-      state.providerTest === "testing"
-        ? "测试中…"
-        : state.providerTest === "ok"
-          ? "连接已通过"
-          : "测试连接";
-
-    const officialContent = `
-      <div class="provider-section-title"><span>连接信息</span><small>官方配置</small></div>
-      <div class="config-list">
-        <button class="config-row" type="button" data-edit="name">
-          <span class="round-icon">${icon("notebook")}</span>
-          <span class="config-copy"><strong>配置名称</strong><span>${esc(config.name)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-edit="address">
-          <span class="round-icon">${icon("globe")}</span>
-          <span class="config-copy"><strong>API 地址</strong><span>${esc(config.address)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-edit="model">
-          <span class="round-icon">${icon("cube")}</span>
-          <span class="config-copy"><strong>Model ID</strong><span>${esc(config.model)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-edit="protocol">
-          <span class="round-icon">${icon("git-branch")}</span>
-          <span class="config-copy"><strong>协议</strong><span>${esc(config.protocol)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-edit="key">
-          <span class="round-icon">${icon("key")}</span>
-          <span class="config-copy"><strong>密钥</strong><span>${esc(config.key)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-      </div>
-      <div class="provider-saved">
-        <button class="config-row" type="button" data-action="toggle-default">
-          <span class="round-icon">${icon("star")}</span>
-          <span class="config-copy"><strong>设为默认</strong><span>启动时自动使用此模型</span></span>
-          <span class="small-toggle ${state.defaultModel ? "is-on" : ""}" aria-hidden="true"></span>
-        </button>
-      </div>
-    `;
-
-    const thirdContent = `
-      <div class="provider-section-title"><span>接口协议</span><small>第三方模型</small></div>
-      <div class="config-list">
-        <button class="config-row" type="button" data-edit="protocol">
-          <span class="round-icon">${icon("git-branch")}</span>
-          <span class="config-copy"><strong>接口协议</strong><span>${esc(config.protocol)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-edit="address">
-          <span class="round-icon">${icon("globe")}</span>
-          <span class="config-copy"><strong>API 地址</strong><span>${esc(config.address)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-edit="model">
-          <span class="round-icon">${icon("cube")}</span>
-          <span class="config-copy"><strong>Model ID</strong><span>${esc(config.model)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-edit="key">
-          <span class="round-icon">${icon("key")}</span>
-          <span class="config-copy"><strong>API Key</strong><span>已保存 ${esc(config.key)}</span></span>
-          ${icon("caret-right", "list-chevron")}
-        </button>
-        <button class="config-row" type="button" data-action="test-connection">
-          <span class="round-icon">${icon("wifi-high")}</span>
-          <span class="config-copy"><strong>测试连接</strong><span>${testLabel}</span></span>
-          ${state.providerTest === "ok" ? `<span class="test-ok">${icon("check-circle")} 可用</span>` : ""}
-        </button>
-      </div>
-      <div class="provider-saved">
-        <div class="provider-section-title"><span>已保存配置</span><small>默认 / 备用</small></div>
-        <div class="third-party-footer">
-          <div class="saved-config">${icon("star")}<span>默认配置</span><small>当前</small></div>
-          <div class="saved-config">${icon("file-text")}<span>备用模型</span><small>备用</small></div>
-        </div>
-      </div>
-    `;
-
-    return shell(
-      `
-        ${heading("API 配置")}
-        <div class="provider-tabs" role="tablist" aria-label="API 配置类型">
-          <button class="provider-tab ${official ? "is-active" : ""}" type="button" data-provider-tab="official">官方</button>
-          <button class="provider-tab ${!official ? "is-active" : ""}" type="button" data-provider-tab="third">第三方</button>
-        </div>
-        <div class="screen-scroll provider-scroll">
-          ${official ? officialContent : thirdContent}
-        </div>
-        <button class="primary-button provider-save-button" type="button" data-action="save-provider">
-          ${icon("check-circle")} ${official ? "保存配置" : "设为当前模型"}
-        </button>
-        ${state.editor ? fieldEditor() : ""}
-      `,
-      "provider-screen"
-    );
-  }
-
-  function fieldEditor() {
-    const editor = state.editor;
-    const labels = {
-      name: "配置名称",
-      address: "API 地址",
-      model: "Model ID",
-      protocol: "接口协议",
-      key: "API Key"
-    };
     return `
-      <div class="editor-backdrop" data-action="close-editor"></div>
-      <form class="field-editor" id="fieldEditorForm">
-        <span class="editor-kicker">EDIT CONFIGURATION</span>
-        <h2>${labels[editor.key] || editor.label}</h2>
-        <label for="fieldEditorInput">轻触输入新值</label>
-        <input id="fieldEditorInput" name="value" type="${editor.key === "key" ? "password" : "text"}" value="${esc(editor.value)}" autocomplete="off" autocapitalize="off" spellcheck="false">
-        <div class="editor-actions">
-          <button type="submit" class="primary-button">保存</button>
-        </div>
-      </form>
-    `;
-  }
-
-  function vpnScreen() {
-    const activeNode = node();
-    return shell(
-      `
-        ${heading("VPN")}
-        <div class="vpn-orbit" aria-hidden="true">
-          <span class="orbit-ring"></span>
-          <span class="orbit-ring"></span>
-          <span class="orbit-ring"></span>
-          <span class="vpn-core">${icon("shield-check")}</span>
-        </div>
-        <div class="vpn-state">
-          <strong>${state.vpnConnected ? "已连接" : "未连接"}</strong>
-          <span>${state.vpnConnected ? "网络已加密 · 节点稳定" : "选择一个节点开始加速"}</span>
-        </div>
-        <div class="glass-card node-card">
-          ${flagsMarkup(activeNode)}
-          <span class="node-card-copy"><small>当前节点</small><strong>${activeNode.name}</strong></span>
-          <span class="node-latency">
-            <span class="latency-bars"><i></i><i></i><i></i><i></i></span>
-            ${activeNode.ping}
-          </span>
-          <button class="icon-button" style="width:30px;height:30px;" type="button" data-nav="nodes" aria-label="选择节点">
-            ${icon("caret-right")}
-          </button>
-        </div>
-        <div class="vpn-actions">
-          <button class="primary-button" type="button" data-action="vpn-toggle">
-            ${icon(state.vpnConnected ? "shield-check" : "wifi-high")}
-            ${state.vpnConnected ? "断开 VPN" : "连接 VPN"}
-          </button>
-          <button class="secondary-button" type="button" data-nav="nodes">
-            ${icon("globe-hemisphere-east")} 选择节点
-          </button>
-        </div>
-      `,
-      `vpn-screen ${state.vpnConnected ? "is-connected" : ""}`
-    );
-  }
-
-  function nodesScreen() {
-    return shell(
-      `
-        ${heading("选择节点")}
-        <div class="screen-scroll">
-          <div class="section-label"><span>全球节点</span><small>自动选择最快的线路</small></div>
-          <div class="node-list">
-            ${NODES.map(
-              (item) => `
-                <button class="list-card node-row ${state.node === item.id ? "is-selected" : ""}" type="button" data-node="${item.id}">
-                  ${flagsMarkup(item)}
-                  <span class="list-copy">
-                    <span class="list-title">${item.name}</span>
-                    <span class="list-sub">${item.secondary}</span>
-                  </span>
-                  <span class="node-latency">
-                    <span class="latency-bars"><i></i><i></i><i></i><i></i></span>
-                    ${item.ping}
-                  </span>
-                  ${state.node === item.id ? `<span class="model-check">${icon("check")}</span>` : ""}
-                </button>
-              `
-            ).join("")}
+      <div class="app-screen record-screen">
+        ${statusBar()}
+        <div class="screen-title">录音摘要</div>
+        <div class="record-visual">
+          <div class="record-wave">${waveBars()}</div>
+          <div class="record-ring">
+            ${icon("waveform")}
+            <span class="record-time">${timerText(state.record.seconds)}</span>
+            <span class="record-state">${state.record.paused ? "录音已暂停" : "正在录音"}</span>
           </div>
         </div>
-        <span class="node-picker-hint">选择后立即切换线路</span>
-      `,
-      "nodes-screen"
-    );
+        <div class="record-card glass-panel"><p>${escapeHtml(state.record.transcript)}</p></div>
+        <div class="record-actions">
+          <button class="round-action is-accent" data-action="pause-recording"><i>${icon(state.record.paused ? "mic" : "pause")}</i>${state.record.paused ? "继续" : "暂停"}</button>
+          <button class="round-action" data-action="mark-recording"><i>${icon("bookmark")}</i>标记</button>
+          <button class="round-action is-danger" data-action="finish-codex"><i>${icon("stop")}</i>结束</button>
+        </div>
+        <div class="record-hint">结束后自动转写并发送给 Codex · 左滑离开页面</div>
+        ${roundToast()}
+      </div>`;
   }
 
-  function renderPage() {
-    switch (state.screen) {
-      case "listening":
-        return listeningScreen();
-      case "answer":
-        return answerScreen();
-      case "actions":
-        return actionsScreen();
-      case "history":
-        return historyScreen();
-      case "prompts":
-        return promptsScreen();
-      case "generating":
-        return generatingScreen();
-      case "imagegen":
-        return imagegenScreen();
-      case "settings":
-        return settingsScreen();
-      case "more":
-        return moreScreen();
-      case "record":
-        return recordScreen();
-      case "recording":
-        return recordingScreen(false);
-      case "paused":
-        return recordingScreen(true);
-      case "transcript":
-        return transcriptScreen();
-      case "summary":
-        return summaryScreen();
-      case "finish":
-        return finishScreen();
-      case "recordings":
-        return recordingsScreen();
-      case "models":
-        return modelsScreen();
-      case "provider":
-        return providerScreen();
-      case "vpn":
-        return vpnScreen();
-      case "nodes":
-        return nodesScreen();
-      case "home":
-      default:
-        return homeScreen();
-    }
+  function runningScreen() {
+    return `
+      <div class="app-screen running-screen">
+        ${statusBar()}
+        <div class="screen-title">Codex 任务</div>
+        <div class="running-orbit"><span class="running-core">${icon("terminal")}</span></div>
+        <div class="running-status">
+          <strong>${escapeHtml(state.task.stage)}</strong>
+          <span>${escapeHtml(state.task.message)} · ${timerText(state.task.elapsed)}</span>
+        </div>
+        <div class="running-card glass-panel"><p>识别：${escapeHtml(state.task.transcript)}</p></div>
+        <button class="danger-pill running-stop" data-action="cancel-task">${icon("stop")}停止任务</button>
+        ${roundToast()}
+      </div>`;
   }
 
-  function stateChip(label, active = false) {
-    return `<span class="state-chip ${active ? "is-active" : ""}">${label}</span>`;
+  function resultScreen() {
+    const points = TASK_POINTS.map(
+      (point, index) => `
+        <section class="result-point">
+          <span class="result-number">0${index + 1}</span>
+          <strong>${escapeHtml(point.title)}</strong>
+          <p>${escapeHtml(point.text)}</p>
+        </section>`
+    ).join("");
+    const body =
+      state.resultTab === "summary"
+        ? points
+        : `<div class="result-transcript">${escapeHtml(TASK_FINAL_TEXT)}</div>`;
+    return `
+      <div class="app-screen result-screen">
+        ${statusBar()}
+        <div class="screen-title">任务结果</div>
+        <div class="result-tabs" role="tablist" aria-label="结果视图">
+          <button class="result-tab ${state.resultTab === "transcript" ? "is-active" : ""}" data-result-tab="transcript" role="tab">转写</button>
+          <button class="result-tab ${state.resultTab === "summary" ? "is-active" : ""}" data-result-tab="summary" role="tab">摘要</button>
+        </div>
+        <div class="result-meta">
+          <span class="soft-chip">${icon("check")} Codex 已完成</span>
+          <span class="soft-chip is-dim">${openAiIcon()} 只读模式</span>
+        </div>
+        <div class="scroll-area result-scroll">${body}</div>
+        <div class="result-actions">
+          <button class="secondary-pill" data-action="copy-result">${icon("copy")}复制</button>
+          <button class="primary-pill" data-action="continue-task">${icon("chat")}继续追问</button>
+        </div>
+        ${roundToast()}
+      </div>`;
   }
 
-  function currentStateChips() {
-    const currentModel = model().chip;
-    switch (state.screen) {
-      case "home":
-        return [
-          stateChip(state.vpnConnected ? "VPN 已连接" : "VPN 未连接", state.vpnConnected),
-          stateChip(currentModel, true),
-          stateChip("语音待机")
-        ];
-      case "listening":
-        return [stateChip("聆听中", true), stateChip(currentModel), stateChip("模拟音频")];
-      case "answer":
-        return [stateChip("回答完成", true), stateChip(state.speaking ? "朗读中" : "朗读关闭", state.speaking), stateChip(currentModel)];
-      case "actions":
-        return [
-          stateChip(state.speaking ? "朗读中" : "朗读关闭", state.speaking),
-          stateChip(state.feedback ? "已反馈" : "待反馈", Boolean(state.feedback))
-        ];
-      case "history":
-        return [stateChip("3 段对话", true), stateChip("本周内容")];
-      case "prompts":
-        return [stateChip("4 个快捷场景", true), stateChip("含图片生成")];
-      case "generating":
-        return [stateChip(state.generatingKind === "image" ? "生成图片" : "生成摘要", true), stateChip("处理中")];
-      case "imagegen":
-        return [stateChip("图片模式", true), stateChip(currentModel)];
-      case "settings":
-        return [stateChip(state.language), stateChip(state.answerStyle, true)];
-      case "more":
-        return [stateChip("系统设置", true), stateChip("1.0.0")];
-      case "record":
-        return [stateChip("准备录音", true), stateChip(currentModel), stateChip(node().name)];
-      case "recording":
-        return [stateChip("录音中", true), stateChip(clockText(state.recordSeconds)), stateChip("实时转写")];
-      case "paused":
-        return [stateChip("已暂停", true), stateChip(clockText(state.recordSeconds)), stateChip("内容保留")];
-      case "transcript":
-        return [stateChip("实时转写", true), stateChip(currentModel), stateChip("已完成")];
-      case "summary":
-        return [stateChip(state.summaryTab === "summary" ? "摘要视图" : "转写视图", true), stateChip("已发送 " + currentModel)];
-      case "finish":
-        return [stateChip("已完成", true), stateChip("2 个待办"), stateChip(currentModel)];
-      case "recordings":
-        return [stateChip("3 条录音", true), stateChip("已摘要")];
-      case "models":
-        return [stateChip("当前 " + currentModel, true), stateChip("4 个可选")];
-      case "provider":
-        return [
-          stateChip(state.providerTab === "official" ? "官方配置" : "第三方配置", true),
-          stateChip(state.defaultModel ? "默认模型" : "非默认")
-        ];
-      case "vpn":
-        return [
-          stateChip(state.vpnConnected ? "VPN 已连接" : "VPN 未连接", state.vpnConnected),
-          stateChip(node().name),
-          stateChip(node().ping)
-        ];
-      case "nodes":
-        return [stateChip("4 个节点", true), stateChip(node().name)];
-      default:
-        return [];
-    }
+  function historyScreen() {
+    const rows = state.history
+      .map(
+        (item) => `
+          <button class="row-card" data-open-history="${escapeHtml(item.id)}">
+            <span class="row-icon">${icon(item.icon)}</span>
+            <span class="row-copy"><span class="row-title">${escapeHtml(item.title)}</span><span class="row-sub">${escapeHtml(item.sub)}</span></span>
+            <span class="status-tag ${item.kind === "result" ? "is-live" : ""}">${escapeHtml(item.tag)}</span>
+            ${icon("arrowRight", "row-chevron")}
+          </button>`
+      )
+      .join("");
+    return `
+      <div class="app-screen list-screen history-screen">
+        ${statusBar()}
+        <div class="screen-title">最近任务</div>
+        <div class="scroll-area"><div class="list-stack">${rows}</div></div>
+        ${roundToast()}
+      </div>`;
   }
+
+  function chatScreen() {
+    const messages = state.chatMessages
+      .map(
+        (message) => `
+          <div class="message ${message.role === "user" ? "user" : ""}">
+            <small>${message.role === "user" ? "你" : "ChatGPT"}</small>
+            <p>${escapeHtml(message.text)}</p>
+          </div>`
+      )
+      .join("");
+    return `
+      <div class="app-screen chat-screen">
+        ${statusBar()}
+        <div class="screen-title">文字对话</div>
+        <div class="scroll-area">${messages || '<div class="empty-state">还没有消息，说一句或打几个字。</div>'}</div>
+        <div class="chat-composer">
+          <input id="chatInput" class="chat-input" value="${escapeHtml(state.chatInput)}" placeholder="输入消息" aria-label="输入消息">
+          <button class="chat-send" data-action="send-chat" aria-label="发送消息">${icon("paperPlane")}</button>
+        </div>
+        ${roundToast()}
+      </div>`;
+  }
+
+  function settingsScreen() {
+    return `
+      <div class="app-screen list-screen settings-screen">
+        ${statusBar()}
+        <div class="screen-title">设置</div>
+        <div class="scroll-area">
+          <div class="list-stack">
+            <button class="row-card" data-action="cycle-backend">
+              <span class="row-icon">${icon("robot")}</span>
+              <span class="row-copy"><span class="row-title">语音后端</span><span class="row-sub">${escapeHtml(state.voiceBackend)} · ${state.voiceBackend === "Codex" ? "异步任务" : "即时回答"}</span></span>
+              <span class="status-tag is-live">已启用</span>${icon("arrowRight", "row-chevron")}
+            </button>
+            <button class="row-card" data-nav="service">
+              <span class="row-icon">${icon("server")}</span>
+              <span class="row-copy"><span class="row-title">AI 服务</span><span class="row-sub">${state.connected ? "已连接 · Magpie" : "未连接"}</span></span>${icon("arrowRight", "row-chevron")}
+            </button>
+            <button class="row-card" data-action="model-info">
+              <span class="row-icon">${icon("cube")}</span>
+              <span class="row-copy"><span class="row-title">Codex 模型</span><span class="row-sub">${escapeHtml(modelLabel(state.provider.codexModel))}</span></span>${icon("arrowRight", "row-chevron")}
+            </button>
+            <div class="row-card static-row" aria-label="手表声音始终静音">
+              <span class="row-icon">${icon("speakerHigh")}</span>
+              <span class="row-copy"><span class="row-title">手表声音</span><span class="row-sub">始终静音 · 不影响睡眠</span></span>
+              <span class="status-tag">固定</span>
+            </div>
+            <button class="row-card" data-action="toggle-haptics">
+              <span class="row-icon">${icon("haptics")}</span>
+              <span class="row-copy"><span class="row-title">触感反馈</span><span class="row-sub">${state.hapticsOn ? "开启" : "关闭"}</span></span>
+              <span class="mini-toggle ${state.hapticsOn ? "is-on" : ""}" role="switch" aria-checked="${state.hapticsOn}"></span>
+            </button>
+          </div>
+        </div>
+        ${roundToast()}
+      </div>`;
+  }
+
+  function serviceScreen() {
+    const rows = [
+      ["url", "globe", "API 地址", state.provider.url],
+      ["token", "key", "访问令牌", state.provider.token],
+      ["repo", "terminal", "只读仓库", state.provider.repo],
+      ["model", "cube", "Ollama 模型", state.provider.model],
+    ]
+      .map(
+        ([field, iconName, label, value]) => `
+          <button class="row-card config-row" data-field="${field}">
+            <span class="row-icon">${icon(iconName)}</span>
+            <span class="row-copy"><span class="row-sub">${escapeHtml(label)}</span><span class="row-title">${escapeHtml(value)}</span></span>
+            ${icon("arrowRight", "row-chevron")}
+          </button>`
+      )
+      .join("");
+    return `
+      <div class="app-screen list-screen service-screen">
+        ${statusBar()}
+        <div class="screen-title">配置详情</div>
+        <div class="scroll-area config-scroll">
+          <div class="list-stack">
+            ${rows}
+          </div>
+        </div>
+        <button class="primary-pill config-save" data-action="save-provider">${icon("shield")}保存配置</button>
+        ${roundToast()}
+      </div>`;
+  }
+
+  function fieldScreen() {
+    const field = state.field || { label: "配置", value: "" };
+    return `
+      <div class="app-screen field-screen">
+        <h2>${escapeHtml(field.label)}</h2>
+        <p>左滑退出，不保存本次修改</p>
+        <input id="fieldInput" class="field-input" value="${escapeHtml(field.value)}" aria-label="${escapeHtml(field.label)}">
+        <button class="primary-pill field-save" data-action="save-field">保存</button>
+        ${roundToast()}
+      </div>`;
+  }
+
+  const RENDERERS = {
+    home: homeScreen,
+    voice: voiceScreen,
+    answer: answerScreen,
+    record: recordScreen,
+    running: runningScreen,
+    result: resultScreen,
+    history: historyScreen,
+    chat: chatScreen,
+    settings: settingsScreen,
+    service: serviceScreen,
+    field: fieldScreen,
+  };
 
   function renderNav() {
-    const groups = ["Talk", "Create", "Record", "System"];
-    const groupLabels = {
-      Talk: "Conversation",
-      Create: "Create & Settings",
-      Record: "Capture & Summary",
-      System: "Models & Network"
+    const nav = $("#screenNav");
+    nav.innerHTML = SCREENS.map((screen, index) => {
+      const active = state.screen === screen.id ? "is-active" : "";
+      return `<button class="nav-item ${active}" data-nav="${screen.id}">
+        <span class="nav-index">${pad(index + 1)}</span>
+        <span class="nav-label">${escapeHtml(screen.label)}</span>
+      </button>`;
+    }).join("");
+    $("#flowCount").textContent = `${SCREENS.length} screens`;
+  }
+
+  function renderContext() {
+    const meta = screenMeta(state.screen);
+    const labels = {
+      home: ["01 / HOME", "一句话，交给 Codex。", "保留参考图的能量球、双胶囊入口和圆屏留白；默认静音，不触发任何音频播放。"],
+      voice: ["02 / VOICE", "一次触控，直接说话。", "语音页复刻高亮麦克风环和双状态胶囊；左滑返回首页。"],
+      answer: ["03 / ANSWER", "回答只保留必要信息。", "用户话语和助手回答采用紧凑圆角气泡，底部动作保持单行。"],
+      record: ["04 / RECORD", "录音摘要就是 Codex 任务入口。", "复刻录音波形、玻璃转写卡和三枚圆形控制；结束后自动创建任务。"],
+      running: ["05 / TASK", "长任务不再卡住 60 秒。", "异步状态页显示识别、执行、整理和耗时；停止会发送取消请求。"],
+      result: ["06 / RESULT", "结果可以读、复制、继续。", "摘要与完整转写同页切换，只保留一个主操作和一个次操作。"],
+      history: ["07 / HISTORY", "最近任务只有一个清单。", "聊天与 Codex 任务共用历史入口，点击后进入对应详情。"],
+      chat: ["08 / CHAT", "文字和语音共享同一会话。", "底部输入与语音入口同时保留，不额外增加独立页面。"],
+      settings: ["09 / SETTINGS", "声音始终关闭。", "语音后端、服务、模型、静音和触感设置集中在一屏。"],
+      service: ["10 / SERVICE", "配置是一项一项编辑的。", "地址、令牌、只读仓库和 Ollama 模型采用两级字阶与圆形图标。"],
+      field: ["11 / FIELD", "没有返回按钮。", "单项配置在圆屏内编辑，左滑退出；保存后回到配置列表。"],
     };
-    navEl.innerHTML = groups
-      .map((group) => {
-        const groupScreens = SCREENS.filter((item) => item.group === group);
-        return `
-          <div class="nav-group">
-            <span class="nav-group-label">${groupLabels[group]}</span>
-            ${groupScreens
-              .map((item) => {
-                const index = SCREENS.findIndex((screen) => screen.id === item.id) + 1;
-                return `
-                  <button class="nav-button ${state.screen === item.id ? "is-active" : ""}" type="button" data-screen="${item.id}">
-                    <span>${pad(index)}</span>
-                    ${item.label}
-                  </button>
-                `;
-              })
-              .join("")}
-          </div>
-        `;
-      })
+    const [index, title, description] = labels[state.screen] || labels.home;
+    $("#contextIndex").textContent = index;
+    $("#contextTitle").textContent = title;
+    $("#contextDescription").textContent = description;
+    const chips = [...meta.meta];
+    if (state.voiceBackend === "Codex") chips.push("Codex");
+    chips.push("始终静音");
+    $("#contextChips").innerHTML = chips
+      .map((chip, i) => `<span class="context-chip ${i === 0 ? "is-live" : ""}">${escapeHtml(chip)}</span>`)
       .join("");
   }
 
-  function updateContext() {
-    const meta = SCREEN_MAP.get(state.screen) || SCREEN_MAP.get("home");
-    contextKicker.textContent = meta.kicker;
-    contextTitle.textContent = meta.title;
-    contextDescription.textContent = meta.description;
-    stateChips.innerHTML = currentStateChips().join("");
-  }
-
-  function updateClockNodes() {
-    document.querySelectorAll(".js-clock").forEach((node) => {
-      node.textContent = currentClock();
-    });
-    document.querySelectorAll(".js-date").forEach((node) => {
-      node.textContent = currentDate();
-    });
-  }
-
-  function stopRecordTimer() {
-    if (recordTimer) {
-      window.clearInterval(recordTimer);
-      recordTimer = null;
-    }
-  }
-
-  function startRecordTimer() {
-    stopRecordTimer();
-    if (state.screen !== "recording" || state.recordStatus !== "active") return;
-    recordTimer = window.setInterval(() => {
-      if (state.screen !== "recording" || state.recordStatus !== "active") return;
-      state.recordSeconds += 1;
-      document.querySelectorAll(".js-record-clock").forEach((node) => {
-        node.textContent = clockText(state.recordSeconds);
+  function bindInputs() {
+    const fieldInput = $("#fieldInput");
+    if (fieldInput) {
+      fieldInput.addEventListener("input", (event) => {
+        if (state.field) state.field.value = event.target.value;
       });
-    }, 1000);
-  }
-
-  function clearFlowTimers() {
-    flowTimers.forEach((timer) => window.clearTimeout(timer));
-    flowTimers = [];
-  }
-
-  function clearGenerationTimer() {
-    if (generationTimer) {
-      window.clearTimeout(generationTimer);
-      generationTimer = null;
+      window.setTimeout(() => fieldInput.focus({ preventScroll: true }), 40);
+    }
+    const chatInput = $("#chatInput");
+    if (chatInput) {
+      chatInput.addEventListener("input", (event) => {
+        state.chatInput = event.target.value;
+      });
+    }
+    const scroll = $(".scroll-area");
+    if (scroll && state.screen === "chat") {
+      scroll.scrollTop = scroll.scrollHeight;
     }
   }
 
-  function scrollScreenTop() {
-    document.querySelectorAll(".screen-scroll, .summary-points, .finish-card").forEach((element) => {
-      element.scrollTop = 0;
-    });
-  }
-
-  function renderScreen() {
-    screenEl.innerHTML = renderPage();
-    const pageChanged = lastRenderedScreen !== state.screen;
-    lastRenderedScreen = state.screen;
-    screenEl.classList.remove("is-page-enter");
-    void screenEl.offsetWidth;
-    screenEl.classList.add("is-page-enter");
+  function render() {
+    const screen = $("#screen");
+    const renderer = RENDERERS[state.screen] || homeScreen;
+    screen.innerHTML = renderer();
+    screen.firstElementChild?.classList.add("is-enter");
     renderNav();
-    updateContext();
-    updateClockNodes();
-
-    if (pageChanged) {
-      scrollScreenTop();
-    }
-
-    if (state.screen === "recording" && state.recordStatus === "active") {
-      startRecordTimer();
-    } else if (state.screen !== "recording") {
-      stopRecordTimer();
-    }
-
-    if (state.editor) {
-      const input = document.querySelector("#fieldEditorInput");
-      if (input) {
-        window.setTimeout(() => {
-          input.focus();
-          input.select();
-        }, 120);
-      }
-    }
+    renderContext();
+    bindInputs();
   }
 
-  function rememberReturnTarget(target, source = state.screen) {
-    if (target === source || !SCREEN_MAP.has(target) || !SCREEN_MAP.has(source)) return;
-    returnTargets.set(target, source);
-  }
-
-  function parentTarget() {
-    const parent = returnTargets.get(state.screen) || PARENTS[state.screen];
-    return parent && parent !== state.screen && SCREEN_MAP.has(parent) ? parent : "";
-  }
-
-  function closeEditor() {
-    state.editor = null;
-    renderScreen();
+  function navigate(screen, { replace = false } = {}) {
+    if (!RENDERERS[screen]) screen = "home";
+    state.screen = screen;
+    const method = replace ? "replaceState" : "pushState";
+    window.history[method](null, "", `#${screen}`);
+    render();
   }
 
   function goBack() {
-    if (state.editor) {
-      closeEditor();
-      return true;
+    const parent = screenMeta(state.screen).parent;
+    if (!parent) {
+      showToast("已在首页");
+      return;
     }
-    const parent = parentTarget();
-    if (!parent) return false;
     navigate(parent);
+  }
+
+  function mainScreenStep(direction) {
+    const order = ["home", "history", "settings"];
+    const index = order.indexOf(state.screen);
+    if (index < 0) return false;
+    const next = (index + (direction > 0 ? 1 : order.length - 1)) % order.length;
+    navigate(order[next]);
     return true;
   }
 
-  function navigate(screenId, options = {}) {
-    if (!SCREEN_MAP.has(screenId)) screenId = "home";
-    if (!options.preserveFlow) {
-      clearFlowTimers();
-      clearGenerationTimer();
-    }
-    if (state.screen === "recording" && screenId !== "recording") {
-      stopRecordTimer();
-    }
-    if (screenId === "paused") {
-      state.recordStatus = "paused";
-    }
-    if (screenId === "recording" && state.recordStatus === "complete") {
-      state.recordStatus = "active";
-      state.recordSeconds = 0;
-    }
-    if (screenId === "recording" && state.recordStatus !== "active" && state.recordStatus !== "paused") {
-      state.recordStatus = "active";
-    }
-    state.screen = screenId;
-    state.editor = null;
-    window.history.replaceState(null, "", `#${screenId}`);
-    renderScreen();
+  function isEditable(target) {
+    return ["INPUT", "TEXTAREA"].includes(target?.tagName);
   }
 
-  function showGlobalToast(message) {
-    window.clearTimeout(toastTimer);
-    globalToast.textContent = message;
-    globalToast.classList.add("is-visible");
-    toastTimer = window.setTimeout(() => {
-      globalToast.classList.remove("is-visible");
-    }, 2100);
+  function bindGestures() {
+    const screen = $("#screen");
+    let start = null;
+    let current = null;
+
+    screen.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || isEditable(event.target)) return;
+      start = { x: event.clientX, y: event.clientY, target: event.target, scroll: event.target.closest?.(".scroll-area") };
+      current = null;
+      screen.setPointerCapture?.(event.pointerId);
+    });
+
+    screen.addEventListener("pointermove", (event) => {
+      if (!start) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      current = { dx, dy };
+      if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
+        screen.firstElementChild?.style.setProperty("--drag-x", `${Math.max(dx * 0.24, -18)}px`);
+        screen.firstElementChild?.classList.add("is-drag");
+      }
+    });
+
+    const finish = () => {
+      if (!start) return;
+      const app = screen.firstElementChild;
+      app?.classList.remove("is-drag");
+      app?.style.removeProperty("--drag-x");
+      const dx = current?.dx || 0;
+      const dy = current?.dy || 0;
+      if (Math.abs(dx) > 54 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) goBack();
+      } else if (Math.abs(dy) > 62 && Math.abs(dy) > Math.abs(dx)) {
+        mainScreenStep(dy < 0 ? 1 : -1);
+      }
+      start = null;
+      current = null;
+    };
+    screen.addEventListener("pointerup", finish);
+    screen.addEventListener("pointercancel", finish);
   }
 
-  function showScreenToast(message) {
-    const toast = document.querySelector("[data-inner-toast]");
-    if (!toast) {
-      showGlobalToast(message);
-      return;
-    }
-    toast.textContent = message;
-    toast.classList.add("is-visible");
-    window.setTimeout(() => toast.classList.remove("is-visible"), 1700);
+  function startVoice() {
+    state.voiceBackend = state.voiceBackend === "Ollama" ? "Ollama" : "Codex";
+    navigate("voice");
   }
 
-  function copyText(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(
-        () => showScreenToast("已复制到剪贴板"),
-        () => showScreenToast("浏览器未允许复制")
-      );
-      return;
-    }
-    const input = document.createElement("textarea");
-    input.value = text;
-    input.style.position = "fixed";
-    input.style.opacity = "0";
-    document.body.appendChild(input);
-    input.select();
-    try {
-      document.execCommand("copy");
-      showScreenToast("已复制到剪贴板");
-    } catch {
-      showScreenToast("浏览器未允许复制");
-    }
-    input.remove();
-  }
-
-  function summaryText() {
-    return [
-      "1. 产品定位与核心目标：聚焦 AI 助手的日常场景落地，提升用户效率与使用体验。",
-      "2. 关键功能与技术方案：确定语音交互、多模态能力和云端大模型的集成方案。",
-      "3. 下一步行动计划：完成原型设计并开展用户测试，收集反馈后迭代优化。"
-    ].join("\n");
-  }
-
-  function transcriptText() {
-    return "本次会议主要围绕产品未来规划展开讨论，明确了功能优化方向、用户体验提升方案，以及下一个版本的发布时间和具体任务分工。";
-  }
-
-  function answerText() {
-    const current = answer();
-    return `${current.intro.replace(/<[^>]+>/g, "")}\n${current.list.join("；")}\n${current.suffix}`;
-  }
-
-  function beginRecording() {
-    state.recordSeconds = 0;
-    state.recordStatus = "active";
-    navigate("recording");
-    showScreenToast("录音已开始 · 模拟麦克风");
-  }
-
-  function stopRecording() {
-    stopRecordTimer();
-    state.recordStatus = "complete";
-    navigate("transcript");
-    showScreenToast("录音结束，正在实时转写");
-  }
-
-  function startGeneration(kind) {
-    const returnTarget = state.screen;
-    state.generatingKind = kind;
-    rememberReturnTarget("generating", returnTarget);
-    clearGenerationTimer();
-    navigate("generating");
-    generationTimer = window.setTimeout(() => {
-      if (state.screen !== "generating") return;
-      if (kind === "image") rememberReturnTarget("imagegen", returnTarget);
-      navigate(kind === "image" ? "imagegen" : "finish");
-    }, 2300);
-  }
-
-  function openAnswer(key, returnTarget = "home") {
-    state.answerKey = key;
-    state.speaking = false;
-    state.feedback = null;
-    rememberReturnTarget("answer", returnTarget);
+  function finishVoice() {
     navigate("answer");
   }
 
-  function promptAnswer(promptKey) {
-    if (promptKey === "image") {
-      startGeneration("image");
+  function startCodexRecording() {
+    state.record = {
+      seconds: 42,
+      running: true,
+      paused: false,
+      marks: 1,
+      transcript:
+        "我认为接下来可以重点关注用户体验的提升，特别是在语音交互和多模态能力的结合上，可能会带来新的机会……",
+    };
+    navigate("record");
+  }
+
+  function toggleRecordingPause() {
+    state.record.paused = !state.record.paused;
+    state.record.running = !state.record.paused;
+    showToast(state.record.paused ? "录音已暂停" : "继续录音");
+  }
+
+  function finishCodexRecording() {
+    state.record.running = false;
+    state.task = {
+      status: "running",
+      taskId: `task-${Date.now()}`,
+      transcript: state.record.transcript.replace(/……$/, ""),
+      startedAt: Date.now(),
+      elapsed: 0,
+      stage: "正在分析任务",
+      message: "Codex 正在理解录音内容",
+      finalText: "",
+    };
+    navigate("running");
+  }
+
+  function tickTask() {
+    if (state.task.status !== "running") return;
+    state.task.elapsed += 1;
+    const elapsed = state.task.elapsed;
+    if (elapsed < 3) {
+      state.task.stage = "正在分析任务";
+      state.task.message = "Codex 正在理解录音内容";
+    } else if (elapsed < 6) {
+      state.task.stage = "正在检查仓库";
+      state.task.message = "读取文件与运行只读命令";
+    } else if (elapsed < 8) {
+      state.task.stage = "正在整理结果";
+      state.task.message = "压缩成适合圆屏阅读的摘要";
+    } else if (elapsed < 10) {
+      state.task.stage = "正在生成语音摘要";
+      state.task.message = "准备 120 字以内的文字摘要";
+    } else {
+      completeTask();
+    }
+  }
+
+  function completeTask() {
+    state.task.status = "succeeded";
+    state.task.stage = "完成";
+    state.task.message = "Codex 已返回结果";
+    state.task.finalText = TASK_FINAL_TEXT;
+    state.history.unshift({
+      id: "task-new",
+      kind: "result",
+      icon: "terminal",
+      title: "检查语音任务桥接",
+      sub: "刚刚 · Codex 已完成",
+      tag: "只读",
+    });
+    if (state.screen === "running") navigate("result");
+  }
+
+  function cancelTask() {
+    state.task.status = "cancelled";
+    state.task.stage = "已停止";
+    state.task.message = "任务已停止，子进程已结束";
+    state.history.unshift({
+      id: "task-cancelled",
+      kind: "result",
+      icon: "terminal",
+      title: "已停止的 Codex 任务",
+      sub: "刚刚 · 已取消",
+      tag: "已停止",
+    });
+    showToast("任务已停止");
+    navigate("history");
+  }
+
+  function copyText(text, label) {
+    navigator.clipboard
+      ?.writeText(text)
+      .then(() => showToast(`${label}已复制`))
+      .catch(() => showToast("复制失败"));
+  }
+
+  function openHistory(id) {
+    const item = state.history.find((entry) => entry.id === id);
+    if (!item) return;
+    if (item.kind === "chat") navigate("chat");
+    else navigate("result");
+  }
+
+  function openField(field) {
+    const fields = {
+      url: { key: "url", label: "API 地址", value: state.provider.url },
+      token: { key: "token", label: "访问令牌", value: state.provider.token },
+      repo: { key: "repo", label: "只读仓库", value: state.provider.repo },
+      model: { key: "model", label: "Ollama 模型", value: state.provider.model },
+    };
+    state.field = fields[field] ? { ...fields[field] } : null;
+    if (state.field) navigate("field");
+  }
+
+  function saveField() {
+    if (!state.field) return;
+    state.provider[state.field.key] = state.field.value.trim();
+    showToast("配置已保存");
+    navigate("service");
+  }
+
+  function sendChat() {
+    const text = state.chatInput.trim();
+    if (!text) {
+      showToast("请输入消息");
       return;
     }
-    const answerKey = ["travel", "food", "fitness"].includes(promptKey) ? promptKey : "travel";
-    openAnswer(answerKey, state.screen);
+    state.chatMessages.push({ role: "user", text });
+    state.chatInput = "";
+    state.chatMessages.push({
+      role: "assistant",
+      text: "收到。我会把结果控制在圆屏可读的长度，并在需要长时间执行时切换成 Codex 异步任务。",
+    });
+    render();
   }
 
-  function openEditor(key) {
-    const config = state.providerTab === "official" ? CONFIG.official : CONFIG.third;
-    state.editor = {
-      key,
-      label: key,
-      value: config[key] || ""
-    };
-    renderScreen();
-  }
-
-  function saveEditor(value) {
-    if (!state.editor) return;
-    const config = state.providerTab === "official" ? CONFIG.official : CONFIG.third;
-    const key = state.editor.key;
-    if (key === "key") {
-      config[key] = value.trim() ? `saved ${"•".repeat(10)}` : "";
-    } else {
-      config[key] = value.trim();
+  function handleAction(action) {
+    switch (action) {
+      case "start-voice":
+        startVoice();
+        break;
+      case "start-codex":
+        startCodexRecording();
+        break;
+      case "finish-voice":
+        finishVoice();
+        break;
+      case "voice-end":
+        goBack();
+        break;
+      case "copy-voice":
+        copyText("任务已完成。前端页面已经收敛，后台会在任务注册表中保留结果。", "回答");
+        break;
+      case "continue-voice":
+        state.chatMessages = [
+          { role: "user", text: "继续说明语音任务桥接。" },
+          { role: "assistant", text: "手表只负责录音、创建任务和轮询结果；PC 端负责 ASR 与 Codex 子进程，结果只以文字返回。" },
+        ];
+        navigate("chat");
+        break;
+      case "mark-recording":
+        state.record.marks += 1;
+        state.record.transcript += " [标记]";
+        showToast(`已添加 ${state.record.marks} 个标记`);
+        break;
+      case "pause-recording":
+        toggleRecordingPause();
+        break;
+      case "finish-codex":
+        finishCodexRecording();
+        break;
+      case "cancel-task":
+        cancelTask();
+        break;
+      case "copy-result":
+        copyText(state.resultTab === "summary" ? TASK_POINTS.map((item) => `${item.title}：${item.text}`).join("\n") : TASK_FINAL_TEXT, "结果");
+        break;
+      case "continue-task":
+        state.chatMessages = [
+          { role: "user", text: "继续展开刚才的 Codex 结果。" },
+          { role: "assistant", text: "可以继续检查任务轮询、取消和日志脱敏；写模式暂不开放。" },
+        ];
+        navigate("chat");
+        break;
+      case "send-chat":
+        sendChat();
+        break;
+      case "cycle-backend":
+        state.voiceBackend = state.voiceBackend === "Codex" ? "Ollama" : "Codex";
+        showToast(`语音后端：${state.voiceBackend}`);
+        break;
+      case "model-info":
+        showToast("Codex 模型由 PC 服务固定");
+        break;
+      case "toggle-haptics":
+        state.hapticsOn = !state.hapticsOn;
+        showToast(state.hapticsOn ? "触感反馈已开启" : "触感反馈已关闭");
+        break;
+      case "save-provider":
+        state.connected = true;
+        showToast("配置已保存");
+        break;
+      case "save-field":
+        saveField();
+        break;
+      default:
+        break;
     }
-    state.editor = null;
-    renderScreen();
-    showScreenToast("配置已保存到本机");
   }
 
-  function cycleLanguage() {
-    const options = ["中文（普通话）", "English", "日本語"];
-    const index = options.indexOf(state.language);
-    state.language = options[(index + 1) % options.length];
-    renderScreen();
-    showScreenToast(`语音语言：${state.language}`);
-  }
-
-  function cycleStyle() {
-    const options = ["平衡", "简洁", "启发式"];
-    const index = options.indexOf(state.answerStyle);
-    state.answerStyle = options[(index + 1) % options.length];
-    renderScreen();
-    showScreenToast(`回答风格：${state.answerStyle}`);
-  }
-
-  function playGuidedFlow() {
-    clearFlowTimers();
-    showGlobalToast("Playback started · voice → answer → follow-up");
-    navigate("listening", { preserveFlow: true });
-    const sequence = [
-      { delay: 2500, screen: "answer" },
-      { delay: 5200, screen: "actions" },
-      { delay: 7400, screen: "home" }
-    ];
-    flowTimers = sequence.map((step) =>
-      window.setTimeout(() => {
-        if (SCREEN_MAP.has(step.screen)) {
-          state.screen = step.screen;
-          renderScreen();
-          window.history.replaceState(null, "", `#${step.screen}`);
-        }
-        if (step.screen === "home") {
-          showGlobalToast("Playback complete · explore the flow rail");
-        }
-      }, step.delay)
-    );
-  }
-
-  function nextScreen(direction) {
-    const currentIndex = SCREENS.findIndex((item) => item.id === state.screen);
-    const nextIndex = (currentIndex + direction + SCREENS.length) % SCREENS.length;
-    navigate(SCREENS[nextIndex].id);
-  }
-
-  function configureScreenInteraction() {
-    screenEl.addEventListener("click", (event) => {
-      const navTarget = event.target.closest("[data-nav]");
-      if (navTarget) {
-        rememberReturnTarget(navTarget.dataset.nav);
-        navigate(navTarget.dataset.nav);
+  function bindActions() {
+    document.addEventListener("click", (event) => {
+      const nav = event.target.closest("[data-nav]");
+      if (nav) {
+        navigate(nav.dataset.nav);
         return;
       }
-
-      const historyTarget = event.target.closest("[data-history]");
-      if (historyTarget) {
-        if (historyTarget.dataset.history === "image") {
-          rememberReturnTarget("imagegen");
-          navigate("imagegen");
-          return;
-        }
-        openAnswer(historyTarget.dataset.history === "learn" ? "travel" : historyTarget.dataset.history, state.screen);
+      const historyButton = event.target.closest("[data-open-history]");
+      if (historyButton) {
+        openHistory(historyButton.dataset.openHistory);
         return;
       }
-
-      const promptTarget = event.target.closest("[data-prompt]");
-      if (promptTarget) {
-        promptAnswer(promptTarget.dataset.prompt);
+      const tab = event.target.closest("[data-result-tab]");
+      if (tab) {
+        state.resultTab = tab.dataset.resultTab;
+        render();
         return;
       }
-
-      const modelTarget = event.target.closest("[data-model]");
-      if (modelTarget) {
-        state.selectedModel = modelTarget.dataset.model;
-        renderScreen();
-        showScreenToast(`${model().name} 已设为当前模型`);
+      const field = event.target.closest("[data-field]");
+      if (field) {
+        openField(field.dataset.field);
         return;
       }
-
-      const nodeTarget = event.target.closest("[data-node]");
-      if (nodeTarget) {
-        state.node = nodeTarget.dataset.node;
-        navigate("vpn");
-        showScreenToast(`已切换到 ${node().name}`);
-        return;
-      }
-
-      const summaryTab = event.target.closest("[data-summary-tab]");
-      if (summaryTab) {
-        state.summaryTab = summaryTab.dataset.summaryTab;
-        renderScreen();
-        return;
-      }
-
-      const providerTab = event.target.closest("[data-provider-tab]");
-      if (providerTab) {
-        state.providerTab = providerTab.dataset.providerTab;
-        state.editor = null;
-        renderScreen();
-        return;
-      }
-
-      const editTarget = event.target.closest("[data-edit]");
-      if (editTarget) {
-        openEditor(editTarget.dataset.edit);
-        return;
-      }
-
-      const actionTarget = event.target.closest("[data-action]");
-      if (!actionTarget) return;
-
-      const action = actionTarget.dataset.action;
-      switch (action) {
-        case "start-voice":
-          navigate("listening");
-          break;
-        case "voice-stop":
-          openAnswer("travel");
-          break;
-        case "new-chat":
-          navigate("listening");
-          break;
-        case "toggle-speak":
-          state.speaking = !state.speaking;
-          renderScreen();
-          showScreenToast(state.speaking ? "正在朗读回答" : "已停止朗读");
-          break;
-        case "toggle-speaker":
-          showScreenToast("扬声器已开启");
-          break;
-        case "copy-answer":
-          copyText(answerText());
-          break;
-        case "feedback-up":
-          state.feedback = "up";
-          renderScreen();
-          showScreenToast("感谢反馈 · 已记录");
-          break;
-        case "feedback-down":
-          state.feedback = "down";
-          renderScreen();
-          showScreenToast("已收到 · 我们会继续改进");
-          break;
-        case "download-image":
-          showScreenToast("图片已保存到相册（演示）");
-          break;
-        case "image-more":
-          showScreenToast("更多：重新生成 / 分享 / 删除");
-          break;
-        case "cycle-language":
-          cycleLanguage();
-          break;
-        case "cycle-style":
-          cycleStyle();
-          break;
-        case "display-settings":
-          showScreenToast("当前使用自动亮度与深色主题");
-          break;
-        case "about-app":
-          showScreenToast("NOVA Watch AI · Aurora 0.4");
-          break;
-        case "start-recording":
-          beginRecording();
-          break;
-        case "pause-recording":
-          state.recordStatus = "paused";
-          stopRecordTimer();
-          navigate("paused");
-          break;
-        case "resume-recording":
-          state.recordStatus = "active";
-          navigate("recording");
-          break;
-        case "stop-recording":
-          stopRecording();
-          break;
-        case "mark-recording":
-          showScreenToast("已标记当前片段");
-          break;
-        case "copy-transcript":
-          copyText(transcriptText());
-          break;
-        case "make-summary":
-          startGeneration("summary");
-          break;
-        case "copy-summary":
-          copyText(state.summaryTab === "summary" ? summaryText() : transcriptText());
-          break;
-        case "follow-up":
-          openAnswer("followup", "finish");
-          break;
-        case "open-record-original":
-          state.summaryTab = "transcript";
-          rememberReturnTarget("summary", "finish");
-          navigate("summary");
-          break;
-        case "record-again":
-          beginRecording();
-          break;
-        case "recording-play":
-          showScreenToast("正在播放录音（演示）");
-          break;
-        case "test-connection":
-          state.providerTest = "testing";
-          renderScreen();
-          window.setTimeout(() => {
-            if (state.screen !== "provider") return;
-            state.providerTest = "ok";
-            renderScreen();
-            showScreenToast("连接通过 · 模型可用");
-          }, 1050);
-          break;
-        case "toggle-default":
-          state.defaultModel = !state.defaultModel;
-          renderScreen();
-          showScreenToast(state.defaultModel ? "已设为默认模型" : "已取消默认模型");
-          break;
-        case "save-provider":
-          showScreenToast(state.providerTab === "official" ? "配置已保存" : "已设为当前模型");
-          window.setTimeout(() => navigate("models"), 420);
-          break;
-        case "vpn-toggle":
-          state.vpnConnected = !state.vpnConnected;
-          renderScreen();
-          showScreenToast(state.vpnConnected ? "VPN 已连接 · 流量已加密" : "VPN 已断开");
-          break;
-        case "generation-result":
-          navigate(state.generatingKind === "image" ? "imagegen" : "finish");
-          break;
-        case "close-editor":
-          closeEditor();
-          break;
-        default:
-          break;
-      }
-    });
-
-    screenEl.addEventListener("submit", (event) => {
-      if (event.target.id !== "fieldEditorForm") return;
-      event.preventDefault();
-      const data = new FormData(event.target);
-      saveEditor(String(data.get("value") || ""));
+      const action = event.target.closest("[data-action]");
+      if (action) handleAction(action.dataset.action);
     });
   }
 
-  function configureRail() {
-    navEl.addEventListener("click", (event) => {
-      const target = event.target.closest("[data-screen]");
-      if (!target) return;
-      navigate(target.dataset.screen);
-    });
-
-    document.querySelector(".brand").addEventListener("click", (event) => {
-      event.preventDefault();
-      navigate("home");
-    });
-
-    playFlowButton.addEventListener("click", playGuidedFlow);
-  }
-
-  function configureGestures() {
-    function resetSwipeVisual() {
-      const appScreen = screenEl.querySelector(".app-screen");
-      const wasDragging = screenEl.classList.contains("is-gesture-dragging");
-      screenEl.classList.remove("is-gesture-dragging");
-      if (wasDragging) screenEl.classList.remove("is-page-enter");
-      if (appScreen) {
-        appScreen.style.removeProperty("--swipe-offset");
-        appScreen.style.removeProperty("--swipe-progress");
-      }
-      swipeStart = null;
-    }
-
-    screenEl.addEventListener(
-      "click",
-      (event) => {
-        if (performance.now() >= suppressClickUntil) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      },
-      true
-    );
-
-    screenEl.addEventListener("pointerdown", (event) => {
-      if (event.target.closest("input")) return;
-      if (!state.editor && !parentTarget()) return;
-      swipeStart = {
-        x: event.clientX,
-        y: event.clientY,
-        pointerId: event.pointerId
-      };
-    });
-
-    screenEl.addEventListener("pointermove", (event) => {
-      if (!swipeStart || event.pointerId !== swipeStart.pointerId) return;
-      const dx = event.clientX - swipeStart.x;
-      const dy = event.clientY - swipeStart.y;
-      const horizontal = dx > 0 && dx > Math.abs(dy) * 1.2;
-      if (!horizontal || dx < 8) return;
-      const appScreen = screenEl.querySelector(".app-screen");
-      if (!appScreen) return;
-      if (!screenEl.hasPointerCapture(event.pointerId)) {
-        screenEl.setPointerCapture(event.pointerId);
-      }
-      screenEl.classList.add("is-gesture-dragging");
-      appScreen.style.setProperty("--swipe-offset", `${Math.min(92, dx * 0.64)}px`);
-      appScreen.style.setProperty("--swipe-progress", String(Math.min(1, dx / 110)));
-    });
-
-    screenEl.addEventListener("pointerup", (event) => {
-      if (!swipeStart) return;
-      const dx = event.clientX - swipeStart.x;
-      const dy = event.clientY - swipeStart.y;
-      const horizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
-      const isBackSwipe = dx > 56 && horizontal;
-      if (horizontal && Math.abs(dx) > 10) {
-        suppressClickUntil = performance.now() + 450;
-      }
-      resetSwipeVisual();
-      if (!isBackSwipe) return;
-      event.preventDefault();
-      goBack();
-    });
-
-    screenEl.addEventListener("pointercancel", resetSwipeVisual);
-
-    window.addEventListener("keydown", (event) => {
-      if (["INPUT", "TEXTAREA"].includes(event.target.tagName)) {
-        if (event.key === "Escape") {
+  function bindKeyboard() {
+    document.addEventListener("keydown", (event) => {
+      if (isEditable(event.target)) {
+        if (event.key === "Enter" && state.screen === "chat") {
           event.preventDefault();
-          goBack();
+          sendChat();
+        }
+        if (event.key === "Enter" && state.screen === "field") {
+          event.preventDefault();
+          saveField();
         }
         return;
       }
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-        nextScreen(1);
-      }
-      if (event.key === "ArrowLeft") {
+      if (event.key === "ArrowRight" || event.key === "Escape") {
         event.preventDefault();
         goBack();
-      }
-      if (event.key === "Escape") {
+      } else if (["home", "history", "settings"].includes(state.screen) && event.key === "ArrowDown") {
         event.preventDefault();
-        goBack();
-      }
-    });
-
-    window.addEventListener("hashchange", () => {
-      const id = window.location.hash.slice(1) || "home";
-      if (SCREEN_MAP.has(id) && id !== state.screen) {
-        navigate(id);
+        mainScreenStep(-1);
+      } else if (["home", "history", "settings"].includes(state.screen) && event.key === "ArrowUp") {
+        event.preventDefault();
+        mainScreenStep(1);
       }
     });
   }
 
-  function initialize() {
-    if (new URLSearchParams(window.location.search).get("capture") === "1") {
-      document.body.classList.add("capture-mode");
+  function tick() {
+    if (FREEZE) return;
+    const beforeTask = state.task.elapsed;
+    if (state.record.running && !state.record.paused) state.record.seconds += 1;
+    tickTask();
+    if (state.screen === "record" || state.screen === "running") {
+      if (state.task.elapsed !== beforeTask || state.record.running) render();
     }
-    const hashScreen = window.location.hash.slice(1);
-    state.screen = SCREEN_MAP.has(hashScreen) ? hashScreen : "home";
-    configureScreenInteraction();
-    configureRail();
-    configureGestures();
-    renderNav();
-    renderScreen();
-    window.setInterval(updateClockNodes, 1000);
   }
 
-  initialize();
+  function initFromHash() {
+    const initial = window.location.hash.slice(1);
+    if (RENDERERS[initial]) state.screen = initial;
+    if (state.screen === "record") {
+      state.record.running = true;
+      state.record.paused = false;
+      state.record.seconds = 42;
+    }
+    if (state.screen === "running" && state.task.status !== "running") {
+      state.task = {
+        status: "running",
+        taskId: "task-preview",
+        transcript: DEFAULT_TRANSCRIPT,
+        startedAt: Date.now(),
+        elapsed: 32,
+        stage: "正在检查仓库",
+        message: "读取文件与运行只读命令",
+        finalText: "",
+      };
+    }
+    if (state.screen === "result") {
+      state.task.status = "succeeded";
+      state.task.finalText = TASK_FINAL_TEXT;
+    }
+    render();
+  }
+
+  bindActions();
+  bindGestures();
+  bindKeyboard();
+  initFromHash();
+  window.addEventListener("popstate", () => {
+    const screen = window.location.hash.slice(1);
+    state.screen = RENDERERS[screen] ? screen : "home";
+    render();
+  });
+  window.setInterval(tick, 1000);
 })();

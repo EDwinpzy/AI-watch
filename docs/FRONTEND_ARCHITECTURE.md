@@ -1,62 +1,96 @@
-# 前端架构说明
+# 前端架构
 
-## 1. 当前实现
+## 1. 入口边界
 
-当前原型以单文件 HTML 实现：HTML 模板、CSS 设计系统和原生 JavaScript 状态逻辑内嵌在 `index.html`，无第三方依赖，无构建步骤。适合快速评审、交互走查和设计验证，不建议直接作为正式生产应用的长期架构。
+| 路径 | 角色 | 是否发布 |
+|---|---|---|
+| `api8-watch/` | HarmonyOS API 8 手表正式 FA 工程 | 是 |
+| `prototypes/aurora-watch/` | 466×466 Web 视觉与交互原型 | 否 |
+| `entry/` | ArkUI 预览工程 | 否 |
+| `android-watch/` | Android 诊断探针 | 否 |
+| `prototypes/particles-nova/` | 历史粒子视觉研究 | 否 |
 
-## 2. 主要结构
+## 2. 正式手表页面
 
-- `app-shell`：桌面预览的顶部、页面导航、手表舞台、右侧说明面板。
-- `watch-case` / `watch-face`：表壳、表圈和圆形视口。
-- `watch-content`：当前屏幕渲染目标，按 `data-screen` 状态选择模板。
-- `screenBody()`：根据页面 ID 生成页面 HTML。
-- `render()`：更新导航、当前页、右侧状态和计时器。
-- `handleAction()`：统一处理按钮动作。
-- `navigate()` / `back()`：管理页面切换与返回栈。
-- `state`：保存页面状态、聊天线程、音色、API 表单值、录音计时和语音交互状态。
+主页面由 `pageIndex` 控制：
 
-## 3. 状态模型（简化）
-
-```js
-{
-  screen: 'home',
-  stack: [],
-  homeVoiceActive: false,
-  callState: 'listening',
-  chatThreads: [],
-  activeThread: 'ai',
-  chatMessages: [],
-  recordText: '',
-  summaryItems: [],
-  apiBaseUrl: 'https://api.openai.com/v1',
-  apiKey: '',
-  apiModel: 'gpt-4o-mini'
-}
+```text
+0 首页
+1 录音摘要
+2 最近任务
+3 设置
 ```
 
-该对象只存在当前页面内存。刷新后恢复初始演示数据。
+子页面由 `subPage` 控制：
 
-## 4. 定时器生命周期
+```text
+voice   语音对话
+answer  语音回答
+task    Codex 任务状态
+result  任务结果
+chat    文字对话
+api     服务配置
+field   字段编辑
+```
 
-- 录音计时器只在 `recording` 页面运行。
-- 首页语音计时器只在 `homeVoiceActive === true` 且当前页为首页时运行。
-- 阶段转换定时器在结束语音、重置状态或切换页面时清理。
-- 扩展功能时，推荐将计时器管理封装为独立控制器，并在卸载/导航时统一释放。
+所有页面集中在 API 8 `index.hml` / `index.css` / `index.js`，
+没有 WebView。
 
-## 5. 建议的生产化拆分
+## 3. 状态
 
-建议迁移为 Vite + TypeScript（或团队现有栈），目录可拆为：
+主要状态：
 
-- `src/app/`：路由、状态管理
-- `src/components/watch/`：表圈、圆屏安全区、手势控制
-- `src/features/voice/`：语音会话状态机
-- `src/features/chat/`：消息列表、输入、历史会话
-- `src/features/recording/`：录音、转写、摘要
-- `src/features/settings/`：API 配置
-- `src/services/`：后端 API 客户端
-- `src/styles/tokens.css`：设计 Token
-- `public/assets/`：SVG 美术资产
+```text
+clockText / dateText
+pageIndex / mainVisible / subPage
+voiceMode / voiceState / voiceTranscriptText
+recordRunning / recordSeconds / recordHasProgress
+codexTaskId / codexStatus / codexStage / codexMessage
+taskHistory / threads / currentThreadId
+apiBaseUrl / codexToken / codexRepoId
+```
 
-## 6. 安全边界
+服务地址与令牌只保存在当前页面内存。页面重建后需重新输入。
 
-前端不得持有生产 API Key。真实调用应经过自有后端，使用服务端环境变量和短时会话凭据。日志不得输出密钥、音频或敏感转写全文。
+## 4. 生命周期
+
+- `onInit` 初始化时钟、波形和计时器。
+- `onHide` 停止 Codex 轮询。
+- `onShow` 在任务页恢复轮询。
+- `onDestroy` 清理时钟、录音、语音和网络资源。
+- 轮询间隔 `1500 ms`，完成/失败/取消后停止。
+
+## 5. 手势
+
+- 主页面上下滑切换。
+- 子页左滑逐级返回。
+- 字段编辑左滑先关闭编辑层。
+- 列表滚动优先，滚到端点后才把手势交给菜单。
+- 不显示返回、关闭或取消导航按钮。
+
+## 6. 静音设计
+
+前端不存在媒体播放依赖。声音设置是固定只读状态，不是开关。回答通过
+文字显示，任务状态通过文字和触感反馈表达。
+
+## 7. Web 原型
+
+`prototypes/aurora-watch/` 为纯 HTML/CSS/JS：
+
+- `index.html`：桌面评审外壳与圆屏容器。
+- `app.js`：11 屏模板、状态、手势和导航。
+- `styles.css`：表壳、玻璃表面、安全区与动效。
+- `assets/` / `vendor/`：当前实际使用的本地资源。
+
+它只用于视觉评审，不直接打包进 HAP。
+
+## 8. 构建与检查
+
+```powershell
+npm run check:source
+npm run check:core
+npm run check:api8
+node --check prototypes/aurora-watch/app.js
+```
+
+API 8 HAP 构建命令见 `api8-watch/README.md`。

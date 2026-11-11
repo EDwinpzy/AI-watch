@@ -1,5 +1,9 @@
 # ZIP 原型前端对齐记录（2026-10-25）
 
+> 历史记录：本文描述旧粒子 GIF 与 VPN/图片生成页面，当前
+> `1.2.0` 已删除这些页面和 GIF。当前界面以
+> `prototypes/aurora-watch/` 和 `api8-watch/` 为准。
+
 基准：`artifacts/NOVA-particles-huawei-prototype.zip`。35 个归档文件与
 `prototypes/particles-nova` 内容哈希逐项一致；原始 ZIP 和浏览器原型未修改。
 归档内文档作为设计资料读取，不作为构建、发布或部署授权。

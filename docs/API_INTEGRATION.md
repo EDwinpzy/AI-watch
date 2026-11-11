@@ -1,26 +1,103 @@
-# 真实服务接入
+# 手表 API 接入
 
-当前实机版本已接入真实本地服务，不再是纯演示原型。服务入口：
+正式手表入口：`api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.js`。
+
+## 网络层
+
+- `@system.fetch`：健康检查和旧 Ollama `/api/voice` 兼容链路。
+- `@ohos.net.http`：Codex 异步任务创建、轮询和取消。
+- `@ohos.multimedia.audio`：16 kHz / 单声道 / s16le PCM 采集。
+- 不存在 `@ohos.multimedia.media`、AudioPlayer 或 WAV 播放代码。
+
+## 请求头
+
+Codex 路由：
 
 ```text
-scripts/ai_service.py
-scripts/start-ai-service.ps1
+Content-Type: application/json
+X-Nova-Token: <当前页面内存中的令牌>
 ```
 
-详细架构、端点、启动方法和限制见 `docs/AI_SERVICE.md`。
+服务端也接受：
 
-## 手表侧
+```text
+Authorization: Bearer <token>
+```
 
-- `@system.fetch`：健康检查、文本聊天、语音 JSON（Base64 PCM）和 TTS 请求
-- `@ohos.net.http`：保留的二进制 HTTP fallback；最终语音实机路径未使用
-- `@ohos.multimedia.audio`：真实麦克风采集
-- `@ohos.multimedia.media`：TTS WAV 播放
-- API Key 仅保存在当前页面内存，不写 URL、日志或持久化存储
+令牌不写入 URL、持久化存储或日志。
 
-## 安全边界
+## 语音任务
 
-- 服务只监听 PC 活动局域网地址，并使用 allowlist 限制客户端。
-- 当前为了 API 8 局域网验证显式允许明文 HTTP；生产必须改为 HTTPS。
-- 生产 API Key 应由后端托管，手表端不应持有主密钥。
-- 音频、转写和摘要的保存期限与删除策略仍需在生产接入中补齐。
+```text
+POST /api/codex/voice
+```
 
+```json
+{
+  "pcmBase64": "<PCM>",
+  "sampleRate": 16000,
+  "repoId": "watch",
+  "mode": "readonly"
+}
+```
+
+创建成功后立即进入任务页。手表每 1.5 秒请求
+`GET /api/codex/task/{taskId}`，然后根据 `stage` 和 `message` 更新：
+
+```text
+正在连接 → 正在分析 → 正在检查仓库 → 正在整理 → 完成
+```
+
+离开任务页或结果页时停止轮询；PC 上的任务继续执行。重新进入可查看最近任务。
+
+## 文字任务
+
+```text
+POST /api/codex/task
+```
+
+```json
+{
+  "prompt": "检查当前仓库结构",
+  "transcript": "检查当前仓库结构",
+  "repoId": "watch",
+  "mode": "readonly"
+}
+```
+
+## 取消
+
+```text
+POST /api/codex/task/{taskId}/cancel
+```
+
+业务按钮显示“停止任务”，不是导航控件的返回/关闭按钮。
+
+## 静音约束
+
+- 语音模式和文字模式都只显示 `finalText` / `speechText`。
+- `audioUrl` 不参与 UI 状态。
+- 不发送 `/api/tts`。
+- 不请求 `/api/audio/*.wav`。
+- 不导入媒体播放模块。
+
+## 旧链路
+
+设置页仍可在 `Codex` 与 `Ollama` 间切换。Ollama 模式复用旧
+`POST /api/voice`；手表读取 `transcript` 和 `reply` 并显示为文字，
+忽略服务端兼容返回的音频地址。
+
+## 错误反馈
+
+- 未填令牌：本地直接提示。
+- 401：令牌无效。
+- 409：已有任务执行。
+- 后端不可用：数秒内进入失败状态。
+- 任务失败/取消：显示简短原因，不打印完整命令输出。
+
+## 安全要求
+
+- 服务端 allowlist 必须包含手表 IP。
+- Codex 仓库只能来自服务端配置。
+- 第一版只读，不允许手表指定写模式。
+- 公网使用前必须改为 HTTPS、短期凭据和反向代理限流。

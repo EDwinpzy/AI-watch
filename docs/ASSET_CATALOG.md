@@ -1,5 +1,10 @@
 # 美术资产清单
 
+> 历史资料：当前正式工程使用
+> `api8-watch/entry/src/main/js/HiWearMainAbility/common/brand/` 和
+> `common/interface-icons/`；Web 原型使用 `prototypes/aurora-watch/assets/`
+> 与 `vendor/`。本页列出的根目录资产不是当前发布来源。
+
 所有资产为本项目独立绘制的 SVG 矢量源文件，可在 Figma、Illustrator、Sketch 或代码项目中继续编辑。
 
 ## 品牌

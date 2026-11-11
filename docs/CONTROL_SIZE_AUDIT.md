@@ -1,5 +1,8 @@
 # 圆屏组件尺寸核查（2026-10-25）
 
+> 历史记录：本文尺寸对应旧 1.0.0 页面，不代表当前 Aurora 界面的
+> 11 屏布局。当前控件与安全区检查以 `QA_CHECKLIST.md` 和真机截图为准。
+
 本次基于 ZIP 原型风格修正控件比例，修改 API 8 `index.hml`、`index.css`，
 新增 `common/control-icons/*.png` 与生成脚本 `scripts/render-control-icons.py`。
 不改服务逻辑，不改签名目录的交付候选，不提交或发布。

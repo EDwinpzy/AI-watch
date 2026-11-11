@@ -1,5 +1,9 @@
 # 开发指南（Development Guide）
 
+> 历史原型指南：当前可运行视觉原型请使用
+> `prototypes/aurora-watch/`，正式设备入口请使用 `api8-watch/`。
+> 本文中根目录 `index.html`、`asset-gallery.html` 和旧测试方式已不是当前入口。
+
 ## 1. 本地运行
 
 ### 方式 A：直接打开
