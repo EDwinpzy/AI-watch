@@ -12,6 +12,7 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 - 默认语音后端为 `codex`，同时保留 Ollama 即时链路。
 - Codex 任务使用 `/api/codex/voice`、`/api/codex/task`、状态轮询与取消。
 - `@ohos.net.http` 负责 Codex 异步请求，`@system.fetch` 保留健康检查与旧链路。
+- PC 服务默认使用 Whisper `small`、简体中文提示词和启动预热。
 - `X-Nova-Token` 只保存在当前页面内存。
 - 无 `@ohos.multimedia.media`、无 AudioPlayer、无 WAV 下载和播放路径。
 
@@ -87,6 +88,16 @@ API 8 检查当前为 75 项，包含：
 
 候选 HAP 与签名材料只保存在本机 `signing/`，不纳入 Git。
 
+发布候选构建：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
+```
+
+脚本要求干净工作区，依次运行源码、前端核心、API 8、Python 单元测试和
+原型语法检查，再做 release 干净构建、HAP 内音频/GIF 检查与
+`hapsigntoolv2` 签名校验。产物和 SHA-256 写入本机 `signing/`。
+
 ## 静音构建校验
 
 2026-11-12 的本机静音构建：
@@ -99,4 +110,6 @@ SHA-256：72060AC3B444043C883903D0EBEAC5A2D74A0678A1D8121820E58DC51A10C48F
 包内容：44 entries；WAV / MP3 / OGG / AAC / M4A / GIF 均为 0
 ```
 
-该记录只证明本机候选包和当前源码，不替代签名、上架或后续版本的发布门禁。
+该记录只证明本机候选包和当前源码。当前 `build-profile.json5` 使用本机可安装
+签名证书，不等同于 AppGallery 正式发布证书；上架前必须替换为正式证书并重新
+执行完整门禁。

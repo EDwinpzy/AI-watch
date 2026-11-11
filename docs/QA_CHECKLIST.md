@@ -78,3 +78,16 @@
 - [ ] 语音、任务、结果、聊天可达。
 - [ ] 麦克风权限流程正常。
 - [ ] 真机截图与日志留存。
+
+## J. 发布回归记录（2026-11-12）
+
+- [x] `python -m unittest -v scripts.test_codex_bridge`：12 项通过。
+- [x] `npm run check:source`：39 项通过。
+- [x] `npm run check:core`：14 项通过。
+- [x] `npm run check:api8`：75 项通过。
+- [x] 真实文字任务：121.77 秒完成，超过 60 秒仍可轮询。
+- [x] 并发保护：第二个任务返回 HTTP `409`。
+- [x] 取消：HTTP `200`，任务进入 `cancelled`，子进程退出。
+- [x] 真实 PCM 语音：创建 `2.72s`，转写正确。
+- [x] 静音返回：`audioUrl` 为空，服务端未生成 TTS 音频。
+- [ ] 干净 release 构建、签名校验和真机安装验收。

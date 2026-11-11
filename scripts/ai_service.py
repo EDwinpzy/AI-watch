@@ -97,6 +97,12 @@ class Runtime:
                      elapsed_ms=round((time.perf_counter() - started) * 1000))
         return self.whisper_model
 
+    def warmup_asr(self) -> None:
+        started = time.perf_counter()
+        self.whisper()
+        self.log(event="whisper_warmup_done", model=self.args.whisper_model,
+                 elapsed_ms=round((time.perf_counter() - started) * 1000))
+
     def write_wav(self, pcm: bytes, path: Path) -> None:
         with wave.open(str(path), "wb") as wav:
             wav.setnchannels(1)
@@ -114,6 +120,7 @@ class Runtime:
                 str(wav_path), language="zh",
                 fp16=self.whisper_model.device.type == "cuda",
                 condition_on_previous_text=False,
+                initial_prompt="以下是普通话的句子，请使用简体中文。",
             )
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         text = (result.get("text") or "").strip()
@@ -378,7 +385,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--model", default="translategemma:4b")
-    parser.add_argument("--whisper-model", default="base")
+    parser.add_argument("--whisper-model", default="small")
     parser.add_argument("--allow-client", action="append", default=[])
     parser.add_argument("--evidence-dir", default=str(DEFAULT_EVIDENCE))
     parser.add_argument("--max-body-bytes", type=int, default=4 * 1024 * 1024)
@@ -397,6 +404,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-evidence-dir", default=str(DEFAULT_CODEX_TASKS))
     parser.add_argument("--codex-backend-timeout", type=float, default=2.0)
     parser.add_argument("--no-warmup", action="store_false", dest="warmup", default=True)
+    parser.add_argument("--warmup-asr", action="store_true", dest="warmup_asr", default=True)
+    parser.add_argument("--no-warmup-asr", action="store_false", dest="warmup_asr")
     return parser.parse_args()
 
 
@@ -408,6 +417,11 @@ def main() -> None:
         args.codex_token = secrets.token_urlsafe(18)
     runtime = Runtime(args)
     Handler.runtime = runtime
+    if args.warmup_asr:
+        try:
+            runtime.warmup_asr()
+        except Exception as exc:
+            runtime.log(event="warmup_error", component="asr", error=str(exc))
     if args.warmup:
         try:
             runtime.chat('你好', args.model)
