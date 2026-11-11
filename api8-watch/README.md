@@ -100,7 +100,21 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
 原型语法检查，再做 release 干净构建、HAP 内音频/GIF 检查与
 `hapsigntoolv2` 签名校验。产物和 SHA-256 写入本机 `signing/`。
 
-## 静音构建校验
+## v1.2.1 发布候选构建
+
+2026-11-12 从干净提交 `0accad4` 生成并通过签名校验：
+
+```text
+文件：signing/NOVA-Watch-AI-fa-api8-v1.2.1-release.hap
+大小：1,191,732 bytes
+SHA-256：5807937C728A4477BD2AC1D96123DB3E9FA6B187D6F6ADCEDFC6B54D4168C6FA
+签名：hapsigntoolv2 verify success
+包内容：44 entries；WAV / MP3 / OGG / AAC / M4A / GIF 均为 0
+```
+
+该候选包尚未安装到手表；真机手势、长轮询、取消和圆屏裁切验收完成后再发布。
+
+## 静音构建校验（v1.2.0 历史记录）
 
 2026-11-12 的 v1.2.0 历史静音构建（保留追溯）：
 

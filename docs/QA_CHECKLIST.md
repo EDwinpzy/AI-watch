@@ -113,5 +113,6 @@
 - [x] `npm run check:core`：14 项通过。
 - [x] `npm run check:api8`：104 项通过。
 - [x] API 8 干净 debug HAP 构建成功。
+- [x] v1.2.1 干净 release 构建与签名校验通过；44 entries，0 音频/GIF。
 - [ ] v1.2.1 真机手势、长轮询、取消、后端切换与圆屏裁切验收。
-- [ ] v1.2.1 干净 release 构建、签名校验和安装验收。
+- [ ] v1.2.1 候选 HAP 真机安装与版本号验收。
