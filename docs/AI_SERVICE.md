@@ -70,6 +70,9 @@ http://127.0.0.1:3425/v1
 | POST | `/api/voice` | 客户端 allowlist | 旧 ASR + Ollama + TTS 兼容链路 |
 | POST | `/api/tts` | 客户端 allowlist | 旧兼容 TTS 端点 |
 
+两个 Codex 创建接口返回 HTTP `200`；API 8 的 `@ohos.net.http` 会把 `202`
+误报为连接异常。任务仍通过 `taskId` 和后续轮询异步执行。
+
 当前 API 8 手表不会调用 `/api/tts`、`/api/audio/*`，也不会播放
 `/api/voice` 返回的音频。新 Codex 任务的 `audioUrl` 固定为空。
 
