@@ -1,9 +1,38 @@
 import audio from '@ohos.multimedia.audio';
 import featureAbility from '@ohos.ability.featureAbility';
 import http from '@ohos.net.http';
+import webSocket from '@ohos.net.webSocket';
 import media from '@ohos.multimedia.media';
 import systemFetch from '@system.fetch';
 import util from '@ohos.util';
+
+function installLegacyTextGlobals() {
+  var scope = null;
+  if (typeof globalThis !== 'undefined') {
+    scope = globalThis;
+  } else if (typeof self !== 'undefined') {
+    scope = self;
+  } else if (typeof window !== 'undefined') {
+    scope = window;
+  }
+  if (!scope) {
+    return;
+  }
+  try {
+    if (typeof scope.escape !== 'function') {
+      scope.escape = function (value) {
+        return encodeURIComponent(String(value)).replace(/%20/g, '%20');
+      };
+    }
+    if (typeof scope.unescape !== 'function') {
+      scope.unescape = function (value) {
+        return decodeURIComponent(String(value));
+      };
+    }
+  } catch (error) {}
+}
+
+installLegacyTextGlobals();
 
 function pad2(value) {
   return value < 10 ? '0' + value : '' + value;
@@ -38,15 +67,6 @@ function extractMessageText(message) {
   return parts.join('').trim();
 }
 
-function asciiBytes(value) {
-  var text = String(value || '');
-  var bytes = new Uint8Array(text.length);
-  for (var i = 0; i < text.length; i++) {
-    bytes[i] = text.charCodeAt(i) & 255;
-  }
-  return bytes;
-}
-
 function toBytes(value) {
   if (value && typeof value.byteLength === 'number' && typeof value.length === 'number') {
     return value;
@@ -54,64 +74,14 @@ function toBytes(value) {
   return new Uint8Array(value);
 }
 
-function concatByteParts(parts) {
-  var total = 0;
-  for (var i = 0; i < parts.length; i++) {
-    total += toBytes(parts[i]).byteLength;
+function toArrayBuffer(value) {
+  var bytes = toBytes(value);
+  if (bytes.byteOffset === 0 && bytes.buffer.byteLength === bytes.byteLength) {
+    return bytes.buffer;
   }
-  var output = new Uint8Array(total);
-  var offset = 0;
-  for (var j = 0; j < parts.length; j++) {
-    var part = toBytes(parts[j]);
-    output.set(part, offset);
-    offset += part.byteLength;
-  }
-  return output;
-}
-
-function writeAscii(view, offset, value) {
-  for (var i = 0; i < value.length; i++) {
-    view.setUint8(offset + i, value.charCodeAt(i));
-  }
-}
-
-function buildWavFromPcm(pcmBuffer) {
-  var pcm = toBytes(pcmBuffer);
-  var output = new Uint8Array(44 + pcm.byteLength);
-  var view = new DataView(output.buffer);
-  writeAscii(view, 0, 'RIFF');
-  view.setUint32(4, 36 + pcm.byteLength, true);
-  writeAscii(view, 8, 'WAVE');
-  writeAscii(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, 16000, true);
-  view.setUint32(28, 32000, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeAscii(view, 36, 'data');
-  view.setUint32(40, pcm.byteLength, true);
-  output.set(pcm, 44);
-  return output.buffer;
-}
-
-function buildMultipartBody(wavBuffer, boundary, engine, language) {
-  var fileHead = '--' + boundary + '\r\n' +
-    'Content-Disposition: form-data; name="file"; filename="voice.wav"\r\n' +
-    'Content-Type: audio/wav\r\n\r\n';
-  var engineField = '\r\n--' + boundary + '\r\n' +
-    'Content-Disposition: form-data; name="engine"\r\n\r\n' + engine;
-  var languageField = '\r\n--' + boundary + '\r\n' +
-    'Content-Disposition: form-data; name="language"\r\n\r\n' + language;
-  var tail = '\r\n--' + boundary + '--\r\n';
-  return concatByteParts([
-    asciiBytes(fileHead),
-    toBytes(wavBuffer),
-    asciiBytes(engineField),
-    asciiBytes(languageField),
-    asciiBytes(tail)
-  ]).buffer;
+  var copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
 }
 
 function normalizeSpeechText(text) {
@@ -153,16 +123,19 @@ var BUILT_IN_BASE_URL = 'https://magpie-relay.pengzhiyuan0724.workers.dev/v1';
 var BUILT_IN_API_KEY = 'sk-magpie-key-ad6d19dafa216d7c0897874814ed03dedf589fe77019f75c';
 var BUILT_IN_MODEL = 'group/ai-watch';
 var BUILT_IN_SYSTEM_PROMPT = '你是 NOVA 手表 AI 助手。回答简洁清楚，优先给出可以直接执行的建议。';
-var STT_URL = 'https://notetakers.vipresearch.ca/stt/v1/transcribe';
-var STT_ENGINE = 'nemotron';
+var STT_WS_URL = 'wss://api.stt.ai/v1/stream';
+var STT_MODEL = 'whisper-large-v3-turbo';
 var STT_LANGUAGE = 'zh';
-var TTS_BASE_URL = 'https://translate.google.com/translate_tts';
+var TTS_BASE_URL = 'https://fanyi.baidu.com/gettts';
 var MAX_CONTEXT_MESSAGES = 12;
 var VOICE_SAMPLE_RATE = 16000;
 var VOICE_CHUNK_BYTES = 6400;
 var VOICE_MAX_SECONDS = 15;
 var VOICE_MIN_BYTES = 12800;
 var TTS_CHUNK_CHARS = 96;
+var STT_CONNECT_TIMEOUT_MS = 15000;
+var STT_FINAL_TIMEOUT_MS = 12000;
+var STT_QUIET_FINALIZE_MS = 1600;
 
 export default {
   data: {
@@ -229,6 +202,22 @@ export default {
     this.voicePlaybackTimer = null;
     this.audioCapturer = null;
     this.audioPlayer = null;
+    this.voiceSocket = null;
+    this.voiceSocketTurnId = 0;
+    this.voiceSocketReady = false;
+    this.voiceConnectTimer = null;
+    this.voiceFinalTimer = null;
+    this.voiceQuietTimer = null;
+    this.voiceReadySettled = false;
+    this.voiceReadyResolve = null;
+    this.voiceReadyReject = null;
+    this.voiceTranscriptSettled = false;
+    this.voiceTranscriptResolve = null;
+    this.voiceTranscriptReject = null;
+    this.voiceSttFinalText = '';
+    this.voiceSttPartialText = '';
+    this.voiceStopping = false;
+    this.voiceStopSent = false;
     this.voicePcmChunks = [];
     this.voiceCapturedBytes = 0;
     this.voiceStartedAt = 0;
@@ -276,6 +265,18 @@ export default {
     if (this.voicePlaybackTimer) {
       clearTimeout(this.voicePlaybackTimer);
       this.voicePlaybackTimer = null;
+    }
+    if (this.voiceConnectTimer) {
+      clearTimeout(this.voiceConnectTimer);
+      this.voiceConnectTimer = null;
+    }
+    if (this.voiceFinalTimer) {
+      clearTimeout(this.voiceFinalTimer);
+      this.voiceFinalTimer = null;
+    }
+    if (this.voiceQuietTimer) {
+      clearTimeout(this.voiceQuietTimer);
+      this.voiceQuietTimer = null;
     }
   },
 
@@ -460,7 +461,19 @@ export default {
           self.showToast('未获得麦克风权限');
           return;
         }
-        self.createAndStartCapturer(turnId);
+        self.setVoicePhase('requesting', '正在连接语音服务…');
+        self.startSpeechSession(turnId).then(function () {
+          if (turnId !== self.voiceTurnId || self.destroyed) {
+            return;
+          }
+          self.createAndStartCapturer(turnId);
+        }).catch(function (error) {
+          if (turnId !== self.voiceTurnId || self.destroyed) {
+            return;
+          }
+          var reason = error && (error.message || error.data) ? (error.message || error.data) : String(error);
+          console.info('[NOVA_STT] connect failed: ' + reason);
+        });
       }).catch(function () {
         if (turnId !== self.voiceTurnId || self.destroyed) {
           return;
@@ -553,6 +566,7 @@ export default {
       self.voiceCapturedBytes += buffer.byteLength;
       self.voiceInputLevel = self.computePcmLevel(buffer);
       self.setVoicePhase('listening', '正在聆听 · 输入 ' + self.voiceInputLevel + '%');
+      self.sendSpeechAudioChunk(buffer);
       if (self.voiceCapturedBytes >= VOICE_SAMPLE_RATE * 2 * VOICE_MAX_SECONDS) {
         self.finishVoiceCapture();
         return;
@@ -592,98 +606,415 @@ export default {
     return Math.min(100, Math.round((rms / 32768) * 190 + (peak / 32768) * 45));
   },
 
-  concatPcmChunks() {
-    var total = 0;
-    for (var i = 0; i < this.voicePcmChunks.length; i++) {
-      total += this.voicePcmChunks[i].byteLength;
-    }
-    if (!total) {
-      return new ArrayBuffer(0);
-    }
-    var result = new Uint8Array(total);
-    var offset = 0;
-    for (var j = 0; j < this.voicePcmChunks.length; j++) {
-      var chunk = new Uint8Array(this.voicePcmChunks[j]);
-      result.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return result.buffer;
-  },
-
   finishVoiceCapture() {
     if (this.voicePhase !== 'listening') {
       return;
     }
     var capturedBytes = this.voiceCapturedBytes;
-    var pcm = this.concatPcmChunks();
     this.stopMicCapture();
     this.voicePcmChunks = [];
     this.voiceCapturedBytes = 0;
-    if (capturedBytes < VOICE_MIN_BYTES || pcm.byteLength < VOICE_MIN_BYTES) {
+    if (capturedBytes < VOICE_MIN_BYTES) {
+      this.cancelSpeechSession();
       this.setVoicePhase('idle', '');
       this.showToast('说话时间太短，请再说一次');
       return;
     }
-    this.submitTranscription(pcm, this.voiceTurnId);
+    this.setVoicePhase('transcribing', '正在整理语音文字…');
+    this.serviceStatus = '转写中';
+    this.voiceStopping = true;
+    this.sendSpeechStop();
   },
 
-  submitTranscription(pcm, turnId) {
+  startSpeechSession(turnId) {
     var self = this;
-    var wav = buildWavFromPcm(pcm);
-    var boundary = '----NOVAWatch' + Date.now().toString(16);
-    var body = this.buildVoiceMultipart(wav, boundary, STT_ENGINE, STT_LANGUAGE);
-    this.setVoicePhase('transcribing', '正在语音转文字…');
-    this.serviceStatus = '转写中';
-    this.binaryRequest(STT_URL, {
-      method: http.RequestMethod.POST,
-      header: {
-        'Content-Type': 'multipart/form-data; boundary=' + boundary
-      },
-      extraData: body,
-      connectTimeout: 30000,
-      readTimeout: 120000
-    }).then(function (result) {
-      if (turnId !== self.voiceTurnId || self.destroyed || self.subPage !== 'chat') {
-        return false;
-      }
-      var payload = self.parseHttpResult(result.result);
-      if (!payload || payload.success === false) {
-        throw new Error((payload && payload.error) || 'transcription failed');
-      }
-      var transcript = String(payload.text || '').replace(/\s+/g, ' ').trim();
-      if (!transcript) {
-        throw new Error('empty transcript');
-      }
-      if (transcript.length > 500) {
-        transcript = transcript.substring(0, 500);
-      }
-      self.voiceTranscriptText = transcript;
-      self.setVoicePhase('thinking', '已转写 · NOVA 正在思考…');
-      return self.sendChatText(transcript, true);
+    this.cancelSpeechSession();
+    this.voiceSocketTurnId = turnId;
+    this.voiceSocketReady = false;
+    this.voiceStopping = false;
+    this.voiceStopSent = false;
+    this.voiceSttFinalText = '';
+    this.voiceSttPartialText = '';
+    this.voiceReadySettled = false;
+    this.voiceTranscriptSettled = false;
+    var readyPromise = new Promise(function (resolve, reject) {
+      self.voiceReadyResolve = resolve;
+      self.voiceReadyReject = reject;
+    });
+    this.voiceTranscriptPromise = new Promise(function (resolve, reject) {
+      self.voiceTranscriptResolve = resolve;
+      self.voiceTranscriptReject = reject;
+    });
+    this.voiceTranscriptPromise.then(function (transcript) {
+      self.completeVoiceTranscript(turnId, transcript);
     }).catch(function (error) {
-      if (turnId !== self.voiceTurnId || self.destroyed) {
+      self.handleVoiceFailure(turnId, error);
+    });
+    this.voiceConnectTimer = setTimeout(function () {
+      self.voiceConnectTimer = null;
+      self.failSpeechSession(turnId, new Error('speech connect timeout'));
+    }, STT_CONNECT_TIMEOUT_MS);
+
+    var socket = null;
+    try {
+      socket = webSocket.createWebSocket();
+      this.voiceSocket = socket;
+      socket.on('open', function (error) {
+        if (turnId !== self.voiceSocketTurnId || self.destroyed) {
+          return;
+        }
+        if (error) {
+          self.failSpeechSession(turnId, error);
+          return;
+        }
+        self.sendSpeechSocketJson({
+          language: STT_LANGUAGE,
+          model: STT_MODEL
+        });
+      });
+      socket.on('message', function (error, data) {
+        self.handleSpeechMessage(turnId, error, data);
+      });
+      socket.on('close', function (error, value) {
+        self.handleSpeechClose(turnId, error, value);
+      });
+      socket.on('error', function (error) {
+        if (turnId !== self.voiceSocketTurnId || self.destroyed) {
+          return;
+        }
+        self.failSpeechSession(turnId, error || new Error('speech socket error'));
+      });
+      var connection = socket.connect(STT_WS_URL);
+      if (connection && typeof connection.catch === 'function') {
+        connection.catch(function (error) {
+          self.failSpeechSession(turnId, error || new Error('speech connect failed'));
+        });
+      }
+    } catch (error) {
+      this.failSpeechSession(turnId, error);
+    }
+    return readyPromise;
+  },
+
+  sendSpeechSocketJson(payload) {
+    var self = this;
+    var socket = this.voiceSocket;
+    if (!socket) {
+      this.failSpeechSession(this.voiceSocketTurnId, new Error('speech socket unavailable'));
+      return;
+    }
+    try {
+      var result = socket.send(JSON.stringify(payload));
+      if (result && typeof result.catch === 'function') {
+        result.catch(function (error) {
+          self.failSpeechSession(self.voiceSocketTurnId, error);
+        });
+      }
+    } catch (error) {
+      this.failSpeechSession(this.voiceSocketTurnId, error);
+    }
+  },
+
+  sendSpeechAudioChunk(buffer) {
+    if (!this.voiceSocket || !this.voiceSocketReady || this.voiceStopping) {
+      return;
+    }
+    var self = this;
+    var socket = this.voiceSocket;
+    var turnId = this.voiceSocketTurnId;
+    try {
+      var payload = toArrayBuffer(buffer);
+      var result = socket.send(payload);
+      if (result && typeof result.catch === 'function') {
+        result.catch(function (error) {
+          self.failSpeechSession(turnId, error);
+        });
+      }
+    } catch (error) {
+      this.failSpeechSession(turnId, error);
+    }
+  },
+
+  sendSpeechStop() {
+    var self = this;
+    var socket = this.voiceSocket;
+    var turnId = this.voiceSocketTurnId;
+    if (!socket || !this.voiceSocketReady) {
+      this.failSpeechSession(turnId, new Error('speech socket not ready'));
+      return;
+    }
+    if (this.voiceStopSent) {
+      return;
+    }
+    this.voiceStopSent = true;
+    try {
+      var result = socket.send(JSON.stringify({ action: 'stop' }));
+      if (result && typeof result.catch === 'function') {
+        result.catch(function (error) {
+          self.failSpeechSession(turnId, error);
+        });
+      }
+    } catch (error) {
+      this.failSpeechSession(turnId, error);
+      return;
+    }
+    this.voiceFinalTimer = setTimeout(function () {
+      self.voiceFinalTimer = null;
+      if (self.voiceSttFinalText) {
+        self.resolveSpeechTranscript(turnId);
+      } else {
+        self.failSpeechSession(turnId, new Error('speech final timeout'));
+      }
+    }, STT_FINAL_TIMEOUT_MS);
+  },
+
+  handleSpeechMessage(turnId, error, data) {
+    if (turnId !== this.voiceSocketTurnId || this.destroyed) {
+      return;
+    }
+    if (error) {
+      this.failSpeechSession(turnId, error);
+      return;
+    }
+    var text = data;
+    if (typeof text !== 'string' && text && typeof text.byteLength === 'number') {
+      try {
+        text = new util.TextDecoder('utf-8').decode(new Uint8Array(text));
+      } catch (decodeError) {
         return;
       }
-      var reason = error && (error.message || error.data) ? (error.message || error.data) : String(error);
-      var message = '语音转写失败，请重试';
-      if (reason.indexOf('429') >= 0) {
-        message = '语音识别繁忙，请稍后再试';
-      } else if (reason.indexOf('timeout') >= 0 || reason.indexOf('timed out') >= 0) {
-        message = '语音识别超时，请重试';
+    }
+    if (typeof text !== 'string') {
+      return;
+    }
+    var payload = null;
+    try {
+      payload = JSON.parse(text);
+    } catch (parseError) {
+      return;
+    }
+    if (payload.error) {
+      this.failSpeechSession(turnId, new Error(String(payload.error)));
+      return;
+    }
+    if (payload.status === 'ready') {
+      this.voiceSocketReady = true;
+      console.info('[NOVA_STT] socket ready');
+      this.settleSpeechReady();
+      return;
+    }
+    console.info('[NOVA_STT] frame text=' +
+      (typeof payload.text === 'string' ? payload.text.length : 0) +
+      ' partial=' + (typeof payload.partial === 'string' ? payload.partial.length : 0) +
+      ' final=' + (payload.is_final === true ? '1' : '0') +
+      ' source=' + (payload.source || ''));
+    if (typeof payload.partial === 'string' && payload.partial.trim()) {
+      this.voiceSttPartialText = payload.partial.trim();
+    }
+    if (typeof payload.text === 'string' && payload.text.trim()) {
+      this.voiceSttFinalText = payload.text.replace(/\s+/g, ' ').trim();
+      if (this.voiceStopping) {
+        this.armSpeechFinalize();
       }
-      console.info('[NOVA_AI] transcription failed: ' + reason);
-      self.serviceStatus = '连接失败';
-      self.setVoicePhase('idle', '');
-      self.showToast(message);
-    });
+    }
+    if (payload.is_final && this.voiceStopping && this.voiceSttFinalText) {
+      this.resolveSpeechTranscript(turnId);
+    }
   },
 
-  buildVoiceMultipart(wavBuffer, boundary, engine, language) {
-    return buildMultipartBody(wavBuffer, boundary, engine, language);
+  handleSpeechClose(turnId, error, value) {
+    if (turnId !== this.voiceSocketTurnId || this.destroyed) {
+      return;
+    }
+    console.info('[NOVA_STT] socket closed code=' +
+      (value && value.code ? value.code : 0) +
+      ' finalChars=' + (this.voiceSttFinalText ? this.voiceSttFinalText.length : 0));
+    if (this.voiceStopping && this.voiceSttFinalText) {
+      this.resolveSpeechTranscript(turnId);
+      return;
+    }
+    var reason = error && (error.message || error.data) ? (error.message || error.data) :
+      ('speech socket closed ' + (value && value.code ? value.code : ''));
+    this.failSpeechSession(turnId, new Error(reason));
   },
 
-  buildVoiceWav(pcmBuffer) {
-    return buildWavFromPcm(pcmBuffer);
+  settleSpeechReady() {
+    if (this.voiceReadySettled) {
+      return;
+    }
+    this.voiceReadySettled = true;
+    if (this.voiceConnectTimer) {
+      clearTimeout(this.voiceConnectTimer);
+      this.voiceConnectTimer = null;
+    }
+    var resolve = this.voiceReadyResolve;
+    this.voiceReadyResolve = null;
+    this.voiceReadyReject = null;
+    if (resolve) {
+      resolve(true);
+    }
+  },
+
+  settleSpeechReadyError(error) {
+    if (this.voiceReadySettled) {
+      return;
+    }
+    this.voiceReadySettled = true;
+    if (this.voiceConnectTimer) {
+      clearTimeout(this.voiceConnectTimer);
+      this.voiceConnectTimer = null;
+    }
+    var reject = this.voiceReadyReject;
+    this.voiceReadyResolve = null;
+    this.voiceReadyReject = null;
+    if (reject) {
+      reject(error);
+    }
+  },
+
+  rejectSpeechTranscript(error) {
+    if (this.voiceTranscriptSettled) {
+      return;
+    }
+    this.voiceTranscriptSettled = true;
+    this.clearSpeechResultTimers();
+    var reject = this.voiceTranscriptReject;
+    this.voiceTranscriptResolve = null;
+    this.voiceTranscriptReject = null;
+    if (reject) {
+      reject(error);
+    }
+  },
+
+  resolveSpeechTranscript(turnId) {
+    if (turnId !== this.voiceSocketTurnId || this.voiceTranscriptSettled) {
+      return;
+    }
+    var transcript = String(this.voiceSttFinalText || '').replace(/\s+/g, ' ').trim();
+    if (!transcript) {
+      this.failSpeechSession(turnId, new Error('empty transcript'));
+      return;
+    }
+    this.voiceTranscriptSettled = true;
+    this.clearSpeechResultTimers();
+    var resolve = this.voiceTranscriptResolve;
+    this.voiceTranscriptResolve = null;
+    this.voiceTranscriptReject = null;
+    this.releaseSpeechSocket();
+    if (resolve) {
+      resolve(transcript);
+    }
+  },
+
+  armSpeechFinalize() {
+    var self = this;
+    if (this.voiceQuietTimer) {
+      clearTimeout(this.voiceQuietTimer);
+    }
+    this.voiceQuietTimer = setTimeout(function () {
+      self.voiceQuietTimer = null;
+      self.resolveSpeechTranscript(self.voiceSocketTurnId);
+    }, STT_QUIET_FINALIZE_MS);
+  },
+
+  clearSpeechResultTimers() {
+    if (this.voiceFinalTimer) {
+      clearTimeout(this.voiceFinalTimer);
+      this.voiceFinalTimer = null;
+    }
+    if (this.voiceQuietTimer) {
+      clearTimeout(this.voiceQuietTimer);
+      this.voiceQuietTimer = null;
+    }
+    if (this.voiceConnectTimer) {
+      clearTimeout(this.voiceConnectTimer);
+      this.voiceConnectTimer = null;
+    }
+  },
+
+  failSpeechSession(turnId, error) {
+    if (turnId !== this.voiceSocketTurnId) {
+      return;
+    }
+    this.stopMicCapture();
+    this.settleSpeechReadyError(error || new Error('speech failed'));
+    this.rejectSpeechTranscript(error || new Error('speech failed'));
+    this.releaseSpeechSocket();
+  },
+
+  releaseSpeechSocket() {
+    var socket = this.voiceSocket;
+    this.voiceSocket = null;
+    this.voiceSocketTurnId = 0;
+    this.voiceSocketReady = false;
+    this.clearSpeechResultTimers();
+    if (!socket) {
+      return;
+    }
+    try { socket.off('open'); } catch (error) {}
+    try { socket.off('message'); } catch (error) {}
+    try { socket.off('close'); } catch (error) {}
+    try { socket.off('error'); } catch (error) {}
+    try {
+      var result = socket.close({ code: 1000, reason: 'done' });
+      if (result && typeof result.catch === 'function') {
+        result.catch(function () {});
+      }
+    } catch (error) {}
+  },
+
+  cancelSpeechSession() {
+    var cancelled = new Error('cancelled');
+    this.stopMicCapture();
+    this.settleSpeechReadyError(cancelled);
+    this.rejectSpeechTranscript(cancelled);
+    this.releaseSpeechSocket();
+  },
+
+  completeVoiceTranscript(turnId, transcript) {
+    var self = this;
+    if (turnId !== this.voiceTurnId || this.destroyed || this.subPage !== 'chat') {
+      return false;
+    }
+    transcript = String(transcript || '').trim();
+    if (!transcript) {
+      this.handleVoiceFailure(turnId, new Error('empty transcript'));
+      return false;
+    }
+    if (transcript.length > 500) {
+      transcript = transcript.substring(0, 500);
+    }
+    this.voiceTranscriptText = transcript;
+    this.setVoicePhase('thinking', '已转写 · NOVA 正在思考…');
+    console.info('[NOVA_STT] transcription complete characters=' + transcript.length);
+    return self.sendChatText(transcript, true);
+  },
+
+  handleVoiceFailure(turnId, error) {
+    if (turnId !== this.voiceTurnId || this.destroyed) {
+      return;
+    }
+    var reason = error && (error.message || error.data) ? (error.message || error.data) : String(error);
+    if (reason === 'cancelled') {
+      return;
+    }
+    var message = '语音转写失败，请重试';
+    if (reason.indexOf('connect') >= 0) {
+      message = '语音服务连接失败，请重试';
+    } else if (reason.indexOf('4029') >= 0 || reason.indexOf('limit') >= 0) {
+      message = '语音识别额度已用完，请稍后再试';
+    } else if (reason.indexOf('4002') >= 0) {
+      message = '语音识别服务暂不可用';
+    } else if (reason.indexOf('429') >= 0) {
+      message = '语音识别繁忙，请稍后再试';
+    } else if (reason.indexOf('timeout') >= 0 || reason.indexOf('timed out') >= 0) {
+      message = '语音识别超时，请重试';
+    }
+    console.info('[NOVA_STT] transcription failed: ' + reason);
+    this.stopMicCapture();
+    this.serviceStatus = '连接失败';
+    this.setVoicePhase('idle', '');
+    this.showToast(message);
   },
 
   getSpeechChunks(text) {
@@ -691,7 +1022,7 @@ export default {
   },
 
   getSpeechUrl(text) {
-    return TTS_BASE_URL + '?ie=UTF-8&client=tw-ob&tl=zh-CN&q=' + encodeURIComponent(text);
+    return TTS_BASE_URL + '?lan=zh&spd=5&source=web&text=' + encodeURIComponent(text);
   },
 
   playSpeechText(text) {
@@ -845,6 +1176,7 @@ export default {
 
   stopVoiceResources() {
     this.voiceTurnId = (this.voiceTurnId || 0) + 1;
+    this.cancelSpeechSession();
     this.stopMicCapture();
     this.stopVoicePlayback();
     this.voicePcmChunks = [];
@@ -862,6 +1194,7 @@ export default {
       this.showToast('自动播报已关闭');
     } else {
       this.showToast('自动播报已开启');
+      this.playSpeechText('语音播报已开启');
     }
   },
 
@@ -874,55 +1207,115 @@ export default {
   },
 
   networkRequest(url, options) {
+    var self = this;
     var method = options.method || 'GET';
+    var extraData = options.extraData;
+    if (extraData !== undefined && method !== 'GET' && typeof extraData === 'object' &&
+      !(extraData instanceof ArrayBuffer)) {
+      extraData = JSON.stringify(extraData);
+    }
+    var requestOptions = {
+      method: method,
+      header: options.header || {},
+      extraData: extraData,
+      connectTimeout: options.connectTimeout,
+      readTimeout: options.readTimeout
+    };
+    return this.fetchRequest(url, requestOptions).catch(function (error) {
+      var reason = error && (error.message || error.data) ?
+        (error.message || error.data) : String(error);
+      console.info('[NOVA_NET] system.fetch fallback: ' + reason);
+      return self.httpRequest(url, requestOptions);
+    });
+  },
+
+  fetchRequest(url, options) {
     return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timeoutTimer = null;
+      var complete = function (error, result) {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+          timeoutTimer = null;
+        }
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(result);
+      };
       var fetchOptions = {
         url: url,
-        method: method,
+        method: options.method || 'GET',
         header: options.header || {},
         responseType: 'text',
         success: function (data) {
           var status = data && data.code ? data.code : 200;
-          console.info('[NOVA_NET] fetch success code=' + status);
           if (status < 200 || status >= 300) {
-            reject(new Error('HTTP ' + status));
+            complete(new Error('HTTP ' + status));
             return;
           }
-          resolve({ result: data ? data.data : '', responseCode: status });
+          complete(null, { responseCode: status, result: data ? data.data : '' });
         },
         fail: function (error, code) {
+          var body = error && error.data;
+          if (code === 200 && typeof body === 'string' &&
+            (body.charAt(0) === '{' || body.charAt(0) === '[')) {
+            complete(null, { responseCode: 200, result: body });
+            return;
+          }
           var message = (error && (error.message || error.data)) || ('fetch ' + code);
-          console.info('[NOVA_NET] fetch failed: ' + message);
-          reject(new Error(message));
+          complete(new Error(message));
         }
       };
-      if (options.extraData !== undefined && method !== 'GET') {
+      if (options.extraData !== undefined && fetchOptions.method !== 'GET') {
         fetchOptions.data = options.extraData;
       }
+      timeoutTimer = setTimeout(function () {
+        complete(new Error('timeout'));
+      }, options.readTimeout || 120000);
       try {
         systemFetch.fetch(fetchOptions);
       } catch (error) {
-        reject(error);
+        complete(error);
       }
     });
   },
 
-  binaryRequest(url, options) {
+  httpRequest(url, options) {
     return new Promise(function (resolve, reject) {
       var client;
+      var requestOptions = {
+        method: options.method || http.RequestMethod.GET,
+        header: options.header || {},
+        connectTimeout: options.connectTimeout || 60000,
+        readTimeout: options.readTimeout || 120000
+      };
+      if (options.extraData !== undefined) {
+        requestOptions.extraData = options.extraData;
+      }
       try {
         client = http.createHttp();
-        client.request(url, options).then(function (result) {
+        client.request(url, requestOptions, function (error, result) {
           try { client.destroy(); } catch (error) {}
+          if (error) {
+            var message = (error && (error.message || error.data)) ?
+              (error.message || error.data) : String(error);
+            console.info('[NOVA_NET] http failed: ' + message);
+            reject(new Error(message));
+            return;
+          }
           var status = result && result.responseCode ? result.responseCode : 0;
+          console.info('[NOVA_NET] http success code=' + status);
           if (status < 200 || status >= 300) {
             reject(new Error('HTTP ' + status));
             return;
           }
           resolve(result);
-        }).catch(function (error) {
-          try { client.destroy(); } catch (destroyError) {}
-          reject(error);
         });
       } catch (error) {
         if (client) {

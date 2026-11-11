@@ -4,6 +4,24 @@
 > 不代表当前 `1.2.0` 的 Magpie Relay + 第三方 STT/TTS 实现。当前边界见
 > [API 接入](API_INTEGRATION.md) 和 [API 8 版本说明](../api8-watch/README.md)。
 
+## 2026-11-11 当前候选
+
+- HUAWEI WATCH 4 `ARC-AL00`，`192.168.1.89:5555`，466×466。
+- 签名 HAP 安装成功，圆屏首页、聊天页和内置服务状态显示正常。
+- 麦克风权限、16 kHz / 单声道 / S16LE 采集、输入电平和 15 秒自动停止
+  已在手表验证。
+- `@ohos.net.webSocket` 可连接 `wss://api.stt.ai/v1/stream`，收到
+  `{"status":"ready"}` 后开始录音，并持续发送 Binary PCM。
+- PC 端使用同一 STT.ai 协议和录音样例成功得到：
+  `{"duration_seconds":2.45,"language":"zh","text":"今天天气怎么样?"}`。
+- 设备直接访问 TTS 地址曾返回 `200 OK`、`audio/mpeg`、8,352 bytes。
+- 服务端会在静音或停止后先发送空的 Vosk `is_final`；客户端已改为只接受
+  非空 Whisper `text`，避免提前关闭连接。
+- 最后这项修正后的有声“手表说话 → 转写 → Magpie → 扬声器”闭环尚未复测。
+  按用户要求，测试设备的实际媒体输出已降为 0，且未再播放测试声音。
+- 最终 HAP：8,189,437 bytes，SHA-256
+  `686FC0DD9359C330127D4AF9142F82A3A650F1C942A41B411A8F84283B3BD0EB`。
+
 更新日期：2026-10-25
 
 ## 当前结论

@@ -116,21 +116,27 @@ assert.ok(
   api8PageSource.includes("getServiceUrl('/chat/completions')"),
   'built-in chat completion endpoint is missing'
 );
-assert.ok(api8PageSource.includes('systemFetch.fetch(fetchOptions)'), 'real system.fetch client is missing');
-assert.ok(api8PageSource.includes('http.createHttp()'), 'binary multipart HTTP client is missing');
+assert.ok(api8PageSource.includes('client.request(url, requestOptions, function (error, result)'), 'API 8 HTTP client is missing');
+assert.ok(api8PageSource.includes('systemFetch.fetch(fetchOptions)'), 'API 8 legacy fetch transport is missing');
+assert.ok(api8PageSource.includes('webSocket.createWebSocket()'), 'API 8 speech WebSocket is missing');
+assert.ok(api8PageSource.includes('socket.connect(STT_WS_URL)'), 'speech WebSocket connection is missing');
 assert.ok(api8PageSource.includes('audio.createAudioCapturer(options)'), 'microphone capture is missing');
 assert.ok(api8PageSource.includes('requestPermissionsFromUser'), 'runtime microphone permission is missing');
 assert.ok(api8PageSource.includes('media.createAudioPlayer()'), 'speech playback is missing');
 assert.ok(
-  api8PageSource.includes("STT_URL = 'https://notetakers.vipresearch.ca/stt/v1/transcribe'"),
+  api8PageSource.includes("STT_WS_URL = 'wss://api.stt.ai/v1/stream'"),
   'speech-to-text endpoint is missing'
 );
 assert.ok(
-  api8PageSource.includes("TTS_BASE_URL = 'https://translate.google.com/translate_tts'"),
+  api8PageSource.includes("STT_MODEL = 'whisper-large-v3-turbo'"),
+  'speech-to-text model is missing'
+);
+assert.ok(
+  api8PageSource.includes("TTS_BASE_URL = 'https://fanyi.baidu.com/gettts'"),
   'text-to-speech endpoint is missing'
 );
-assert.ok(api8PageSource.includes('buildWavFromPcm(pcm)'), 'PCM to WAV conversion is missing');
-assert.ok(api8PageSource.includes('buildMultipartBody('), 'multipart upload body is missing');
+assert.ok(api8PageSource.includes('VOICE_CHUNK_BYTES'), 'PCM streaming chunks are missing');
+assert.ok(api8PageSource.includes("JSON.stringify({ action: 'stop' })"), 'speech stop frame is missing');
 assert.ok(api8PageSource.includes('splitSpeechText(text, TTS_CHUNK_CHARS)'), 'speech chunking is missing');
 assert.ok(api8PageSource.includes('max_tokens: 512'), 'chat token budget is missing');
 assert.ok(api8PageSource.includes("extractMessageText(choice && choice.message)"), 'OpenAI response parsing is missing');

@@ -18,34 +18,43 @@ API 8 手表端使用固定的 Magpie Relay 连接，不再提供用户可编辑
 
 ## 语音配置
 
-| 能力 | 端点 | 参数 |
+| 能力 | 端点 | 协议 |
 |---|---|---|
-| STT | `POST https://notetakers.vipresearch.ca/stt/v1/transcribe` | `file` WAV、`engine=nemotron`、`language=zh` |
-| TTS | `GET https://translate.google.com/translate_tts` | `client=tw-ob`、`tl=zh-CN`、`q=<分片文本>` |
+| STT | `wss://api.stt.ai/v1/stream` | 连接后发送 `{"language":"zh","model":"whisper-large-v3-turbo"}`，再发送 16 kHz、单声道、S16LE 原始 PCM 二进制帧 |
+| TTS | `https://fanyi.baidu.com/gettts` | `lan=zh&spd=5&source=web&text=<分片文本>` |
 
-STT 返回结构：
+STT 服务先返回：
 
 ```json
-{
-  "success": true,
-  "text": "今天天气怎么样？",
-  "engine": "nemotron",
-  "language": "zh"
-}
+{"status":"ready"}
 ```
 
-手表端先采集 16 kHz、单声道、S16LE PCM，再补 44 字节 WAV 头。请求体由
-客户端手工拼接 `multipart/form-data`，通过 API 8 `@ohos.net.http` 的
-`ArrayBuffer` 请求体上传。录音为空、过短、超时、非 2xx、`success: false`
-或空转写都会转为简短错误提示。
+结束时发送 `{"action":"stop"}`。随后可能收到 Vosk partial，以及 Whisper 的
+非流式结果：
+
+```json
+{"text":"今天天气怎么样","partial":"...","is_final":false,"source":"whisper","language":"zh"}
+```
+
+服务端可能在停止后先发送空的 Vosk `is_final`。客户端必须忽略空文本 final，
+继续等待非空 Whisper `text`；最后一个非空文字稳定 1.6 秒后作为最终转写，
+最长等待 12 秒。空文本、超时、异常关闭、额度限制和网络失败会转为简短提示。
+
+手表端使用 API 8 `@ohos.net.webSocket` 的 `ArrayBuffer` 发送能力，不封装
+WAV，也不使用 HTTP multipart。WebSocket 收到 `ready` 后才启动麦克风，避免
+录音数据早于会话就绪而丢失。单次录音上限 15 秒，短于约 0.4 秒会提示重说。
 
 AI 回复会先移除 Markdown 标记，再按中文标点切成不超过 96 字符的分片。
 每个分片生成一个 HTTPS TTS URL，由 `media.AudioPlayer` 顺序播放。
 第三段尚未结束前不会提前创建后续播放器；用户再次点按麦克风会中断播报。
 
-STT/TTS 均无需 API Key，但都是第三方公共服务，存在限流、延迟、网络可达性
-和隐私边界变化的风险。当前 TTS 地址不是正式 SLA 接口；若返回非音频内容，
-客户端会停止播报并保留文字回复。
+STT/TTS 均无需 API Key，但都是第三方公共服务。STT.ai 的匿名免费额度可能
+调整；TTS 地址不是正式 SLA 接口。若 STT 不可达，手表会停留在失败提示；
+若 TTS 返回非音频内容，客户端会停止播报并保留文字回复。
+
+当前测试 Wi-Fi 下，手表直连 Magpie 和 STT.ai 会超时，需将设备系统
+`http_proxy` 指向同网段 PC 代理后才能访问。该代理地址不在 HAP 中硬编码，
+也不属于正式部署方案。
 
 ## 请求
 

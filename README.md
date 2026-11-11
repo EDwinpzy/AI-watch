@@ -10,14 +10,15 @@
   内容集中在圆形安全区内。
 - 四个主页面：表盘、语音、最近对话、设置；聊天作为圆形子页面呈现。
 - 聊天页提供文字输入、麦克风、语音状态、发送状态和错误反馈。
-- 语音输入使用手表麦克风采集 16 kHz 单声道 PCM，封装为 WAV 后转写；
+- 语音输入使用手表麦克风采集 16 kHz 单声道 PCM，通过 WebSocket 实时发送；
   识别文字会自动作为用户消息发送。
 - AI 回复默认按中文标点分片并自动播报，可在设置页关闭。
 - AI 服务连接已经内置，手表端没有 Base URL、API Key 或模型编辑入口。
 - 内置模型为 `group/ai-watch`，请求
   `https://magpie-relay.pengzhiyuan0724.workers.dev/v1/chat/completions`。
 - 内置中继不提供可用的 ASR/TTS；语音转写使用
-  `https://notetakers.vipresearch.ca/stt/v1/transcribe`，播报使用在线 TTS。
+  `wss://api.stt.ai/v1/stream`（`whisper-large-v3-turbo`），播报使用
+  `https://fanyi.baidu.com/gettts`。
 - 声明 `ohos.permission.INTERNET` 与 `ohos.permission.MICROPHONE`，
   并关闭明文 HTTP。
 
@@ -63,16 +64,18 @@ npm run check:core
 npm run check:api8
 ```
 
-当前结果：三组检查全部通过；`check:source` 61 项结构约束，
-`check:core` 14 项断言，`check:api8` 118 项断言。API 8
+当前结果：三组检查全部通过；`check:source` 64 项结构约束，
+`check:core` 14 项断言，`check:api8` 119 项断言。API 8
 `LegacyCompileJS`、`LegacyPackageHap` 和 `SignHap` 已通过本地构建。
 
-当前签名 HAP 为 8,126,045 bytes，SHA-256
-`AE79ECAE8479BBAF3C2A4FC4F38DAFA1B284A091170F9793967EAA65AC8256C1`。
+当前签名 HAP 为 8,189,437 bytes，SHA-256
+`686FC0DD9359C330127D4AF9142F82A3A650F1C942A41B411A8F84283B3BD0EB`。
 
-构建成功不等于实机已验证。当前没有连接可确认的 HarmonyOS 手表；
-真实麦克风权限、采集、WAV 上传、TTS 播放、圆形界面和软键盘输入仍需
-在 HUAWEI WATCH 4 上复核。
+已在 HUAWEI WATCH 4 `ARC-AL00`（`192.168.1.89:5555`）确认安装、466×466
+圆屏布局、麦克风权限、16 kHz 采集、WebSocket `ready` 和持续 PCM 发送。
+PC 端使用同一 STT.ai 协议已成功转出中文样例；最后修正空 Vosk `is_final`
+后的有声完整闭环与扬声器实际出声尚未复测。测试设备实际媒体输出已降为 0，
+且未再播放任何测试声音。
 
 ## 文档
 

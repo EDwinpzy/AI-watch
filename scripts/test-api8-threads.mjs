@@ -12,6 +12,7 @@ for (const specifier of [
   '@ohos.ability.featureAbility',
   '@ohos.net.http',
   '@ohos.multimedia.media',
+  '@ohos.net.webSocket',
   '@system.fetch',
   '@ohos.util'
 ]) {
@@ -34,6 +35,27 @@ let capturerStops = 0;
 let audioOptions = null;
 let activeCapturer = null;
 const mediaPlayers = [];
+const fetchState = {
+  calls: 0,
+  options: null,
+  response: {
+    code: 200,
+    data: JSON.stringify({
+      model: 'group/ai-watch',
+      ok: true
+    })
+  },
+  failNext: false
+};
+const webSocketState = {
+  connectCalls: 0,
+  url: '',
+  handlers: {},
+  sent: [],
+  binaryBytes: 0,
+  closed: false,
+  closeAfterText: false
+};
 const httpState = {
   calls: 0,
   destroys: 0,
@@ -41,7 +63,10 @@ const httpState = {
   capturedOptions: null,
   response: {
     responseCode: 200,
-    result: JSON.stringify({ success: true, text: '数组缓冲转写' })
+    result: JSON.stringify({
+      model: 'group/http-fallback',
+      ok: true
+    })
   }
 };
 
@@ -87,15 +112,29 @@ const sandbox = {
       };
     }
   },
+  systemFetch: {
+    fetch(options) {
+      fetchState.calls++;
+      fetchState.options = options;
+      setTimeout(() => {
+        if (fetchState.failNext) {
+          fetchState.failNext = false;
+          options.fail({ message: 'request data error' }, 0);
+          return;
+        }
+        options.success(fetchState.response);
+      }, 0);
+    }
+  },
   http: {
     RequestMethod: { GET: 'GET', POST: 'POST' },
     createHttp() {
       httpState.calls++;
       return {
-        request(url, options) {
+        request(url, options, callback) {
           httpState.capturedUrl = url;
           httpState.capturedOptions = options;
-          return Promise.resolve(httpState.response);
+          setTimeout(() => callback(null, httpState.response), 0);
         },
         destroy() {
           httpState.destroys++;
@@ -145,15 +184,84 @@ const sandbox = {
       return player;
     }
   },
-  systemFetch: {
-    fetch(options) {
-      options.success({
-        code: 200,
-        data: JSON.stringify({
-          model: 'group/ai-watch',
-          ok: true
-        })
-      });
+  webSocket: {
+    createWebSocket() {
+      const socket = {
+        on(type, callback) {
+          webSocketState.handlers[type] = callback;
+        },
+        off(type) {
+          delete webSocketState.handlers[type];
+        },
+        connect(url) {
+          webSocketState.connectCalls++;
+          webSocketState.url = url;
+          setTimeout(() => {
+            if (webSocketState.handlers.open) {
+              webSocketState.handlers.open(null, {});
+            }
+          }, 0);
+          return Promise.resolve(true);
+        },
+        send(data) {
+          webSocketState.sent.push(data);
+          if (typeof data === 'string') {
+            const payload = JSON.parse(data);
+            if (payload.language && payload.model) {
+              setTimeout(() => {
+                if (webSocketState.handlers.message) {
+                  webSocketState.handlers.message(null, JSON.stringify({ status: 'ready' }));
+                }
+              }, 0);
+            } else if (payload.action === 'stop') {
+              setTimeout(() => {
+                if (webSocketState.handlers.message) {
+                  webSocketState.handlers.message(null, JSON.stringify({
+                    text: '',
+                    partial: '',
+                    is_final: true,
+                    source: 'vosk'
+                  }));
+                  webSocketState.handlers.message(null, JSON.stringify({
+                    text: '今天天气',
+                    partial: '今天天气',
+                    is_final: false,
+                    source: 'whisper'
+                  }));
+                }
+              }, 0);
+              setTimeout(() => {
+                if (webSocketState.handlers.message) {
+                  webSocketState.handlers.message(null, JSON.stringify({
+                    text: '今天天气怎么样？',
+                    partial: '今天天气怎么样',
+                    is_final: !webSocketState.closeAfterText,
+                    source: 'whisper'
+                  }));
+                  if (webSocketState.closeAfterText && webSocketState.handlers.close) {
+                    webSocketState.handlers.close(null, { code: 1006, reason: '' });
+                  }
+                }
+              }, 5);
+            }
+          } else {
+            webSocketState.binaryBytes += data.byteLength;
+          }
+          return Promise.resolve(true);
+        },
+        close() {
+          if (!webSocketState.closed) {
+            webSocketState.closed = true;
+            setTimeout(() => {
+              if (webSocketState.handlers.close) {
+                webSocketState.handlers.close(null, { code: 1000, reason: '' });
+              }
+            }, 0);
+          }
+          return Promise.resolve(true);
+        }
+      };
+      return socket;
     }
   },
   util: {
@@ -180,9 +288,6 @@ const page = Object.assign({}, structuredClone(component.data), component);
 page.onInit();
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-const view = (buffer) => new DataView(buffer);
-const asciiAt = (buffer, offset, length) =>
-  Buffer.from(new Uint8Array(buffer, offset, length)).toString('ascii');
 
 assert.equal(page.threads.length, 2);
 assert.equal(page.builtInModel, 'group/ai-watch');
@@ -200,53 +305,37 @@ assert.ok(!pageSource.includes('/api/voice'));
 assert.ok(!pageSource.includes('/api/tts'));
 assert.ok(!pageSource.includes('apiBaseUrl'));
 assert.ok(!pageSource.includes('apiKey:'));
-assert.match(pageSource, /STT_URL = 'https:\/\/notetakers\.vipresearch\.ca\/stt\/v1\/transcribe'/);
-assert.match(pageSource, /TTS_BASE_URL = 'https:\/\/translate\.google\.com\/translate_tts'/);
+assert.match(pageSource, /STT_WS_URL = 'wss:\/\/api\.stt\.ai\/v1\/stream'/);
+assert.match(pageSource, /STT_MODEL = 'whisper-large-v3-turbo'/);
+assert.match(pageSource, /TTS_BASE_URL = 'https:\/\/fanyi\.baidu\.com\/gettts'/);
+assert.ok(!pageSource.includes('@ohos.fileio'));
+assert.ok(!pageSource.includes('@ohos.request'));
+assert.ok(!pageSource.includes('uploadVoiceWav'));
+assert.equal(typeof page.buildVoiceWav, 'undefined');
 
 const fetchResult = await page.networkRequest('https://example.test/v1/models', { method: 'GET' });
 assert.equal(fetchResult.responseCode, 200);
 assert.equal(page.parseHttpResult(fetchResult.result).model, 'group/ai-watch');
+assert.equal(fetchState.calls, 1);
+assert.equal(httpState.calls, 0);
+
+fetchState.failNext = true;
+const fallbackResult = await page.networkRequest('https://example.test/v1/models', { method: 'GET' });
+assert.equal(fallbackResult.responseCode, 200);
+assert.equal(page.parseHttpResult(fallbackResult.result).model, 'group/http-fallback');
+assert.equal(httpState.calls, 1);
+assert.equal(httpState.destroys, 1);
 
 const utf8Json = new TextEncoder().encode(JSON.stringify({ text: '中文语音' }));
 assert.equal(page.parseHttpResult(utf8Json.buffer).text, '中文语音');
 
-const binaryResult = await page.binaryRequest('https://example.test/upload', {
-  method: 'POST',
-  extraData: new Uint8Array([1, 2, 3]).buffer
-});
-assert.equal(binaryResult.responseCode, 200);
-assert.equal(httpState.calls, 1);
-assert.equal(httpState.destroys, 1);
-assert.equal(httpState.capturedUrl, 'https://example.test/upload');
-assert.equal(page.parseHttpResult(binaryResult.result).text, '数组缓冲转写');
-
-const pcm = new Uint8Array(3200);
+const pcm = new Uint8Array(32000);
 for (let index = 0; index < pcm.length; index++) {
   pcm[index] = index % 256;
 }
-const wav = page.buildVoiceWav(pcm.buffer);
-assert.equal(wav.byteLength, 44 + pcm.byteLength);
-assert.equal(asciiAt(wav, 0, 4), 'RIFF');
-assert.equal(asciiAt(wav, 8, 4), 'WAVE');
-assert.equal(asciiAt(wav, 12, 4), 'fmt ');
-assert.equal(asciiAt(wav, 36, 4), 'data');
-assert.equal(view(wav).getUint32(4, true), wav.byteLength - 8);
-assert.equal(view(wav).getUint16(20, true), 1);
-assert.equal(view(wav).getUint16(22, true), 1);
-assert.equal(view(wav).getUint32(24, true), 16000);
-assert.equal(view(wav).getUint32(28, true), 32000);
-assert.equal(view(wav).getUint16(34, true), 16);
-assert.equal(view(wav).getUint32(40, true), pcm.byteLength);
-
-const multipart = page.buildVoiceMultipart(wav, 'NOVA-BOUNDARY', 'nemotron', 'zh');
-const multipartText = Buffer.from(new Uint8Array(multipart)).toString('latin1');
-assert.ok(multipart.byteLength > wav.byteLength);
-assert.match(multipartText, /Content-Disposition: form-data; name="file"; filename="voice.wav"/);
-assert.match(multipartText, /Content-Type: audio\/wav/);
-assert.match(multipartText, /name="engine"\r\n\r\nnemotron/);
-assert.match(multipartText, /name="language"\r\n\r\nzh/);
-assert.ok(multipartText.startsWith('--NOVA-BOUNDARY'));
-assert.ok(multipartText.endsWith('--NOVA-BOUNDARY--\r\n'));
+assert.ok(!pageSource.includes('notetakers.vipresearch.ca'));
+assert.ok(!pageSource.includes('buildWavFromPcm'));
+assert.ok(!pageSource.includes('multipart/form-data'));
 
 const speechChunks = page.getSpeechChunks(
   '第一句说明天气和出行安排。第二句说明工作重点，并提醒休息。' +
@@ -258,7 +347,7 @@ assert.ok(speechChunks.every((chunk) => chunk.length <= 96));
 assert.ok(speechChunks.join('').includes('今天的行动建议'));
 assert.equal(
   page.getSpeechUrl('你好 世界'),
-  'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-CN&q=' +
+  'https://fanyi.baidu.com/gettts?lan=zh&spd=5&source=web&text=' +
     encodeURIComponent('你好 世界')
 );
 
@@ -279,6 +368,28 @@ page.networkRequest = function (url, options) {
     })
   });
 };
+
+page.voiceOutputEnabled = false;
+page.newChat();
+page.startVoiceInput();
+await wait(40);
+assert.equal(page.voicePhase, 'listening');
+assert.equal(webSocketState.connectCalls, 1);
+assert.equal(webSocketState.url, 'wss://api.stt.ai/v1/stream');
+assert.equal(JSON.parse(webSocketState.sent[0]).language, 'zh');
+assert.equal(JSON.parse(webSocketState.sent[0]).model, 'whisper-large-v3-turbo');
+page.sendSpeechAudioChunk(pcm.buffer);
+page.voicePcmChunks = [pcm.buffer];
+page.voiceCapturedBytes = pcm.byteLength;
+page.finishVoiceCapture();
+await wait(80);
+assert.equal(webSocketState.binaryBytes, pcm.byteLength);
+assert.equal(JSON.parse(webSocketState.sent.at(-1)).action, 'stop');
+assert.equal(page.voiceTranscriptText, '今天天气怎么样？');
+assert.equal(page.chatMessages.at(-2).text, '今天天气怎么样？');
+assert.equal(page.chatMessages.at(-1).text, '内置模型回复。');
+assert.equal(page.voicePhase, 'idle');
+
 page.voiceOutputEnabled = false;
 page.newChat();
 page.chatInput = '网络请求测试';
@@ -318,7 +429,6 @@ assert.equal(page.voicePhase, 'idle');
 assert.equal(page.toastText, '未获得麦克风权限');
 permissionGranted = true;
 
-let capturedTranscription = null;
 page.networkRequest = function (url, options) {
   capturedChat = { url, options };
   return Promise.resolve({
@@ -329,45 +439,39 @@ page.networkRequest = function (url, options) {
     })
   });
 };
-page.binaryRequest = function (url, options) {
-  capturedTranscription = { url, options };
-  return Promise.resolve({
-    responseCode: 200,
-    result: JSON.stringify({
-      success: true,
-      text: '今天天气怎么样？',
-      engine: 'nemotron',
-      language: 'zh'
-    })
-  });
-};
 page.voiceOutputEnabled = false;
 page.newChat();
 const startsBefore = capturerStarts;
 const permissionBefore = permissionRequests;
+const binaryBefore = webSocketState.binaryBytes;
+const socketCallsBefore = webSocketState.connectCalls;
+webSocketState.closeAfterText = true;
 page.startVoiceInput();
-await wait(30);
+await wait(40);
 assert.equal(permissionRequests, permissionBefore + 1);
 assert.equal(capturerStarts, startsBefore + 1);
+assert.equal(webSocketState.connectCalls, socketCallsBefore + 1);
 assert.equal(page.voicePhase, 'listening');
 assert.equal(audioOptions.streamInfo.samplingRate, 16000);
 assert.equal(audioOptions.streamInfo.channels, 1);
 assert.equal(audioOptions.streamInfo.sampleFormat, 3);
 assert.equal(audioOptions.capturerInfo.source, 1);
 
-page.voicePcmChunks = [new Uint8Array(16000).buffer];
+const capturedPcm = new Uint8Array(16000);
+page.sendSpeechAudioChunk(capturedPcm.buffer);
+page.voicePcmChunks = [capturedPcm.buffer];
 page.voiceCapturedBytes = 16000;
 const stopsBefore = capturerStops;
 page.finishVoiceCapture();
-await wait(40);
+await wait(60);
 assert.equal(capturerStops, stopsBefore + 1);
-assert.equal(capturedTranscription.url, 'https://notetakers.vipresearch.ca/stt/v1/transcribe');
-assert.equal(capturedTranscription.options.extraData.byteLength > 16000, true);
-assert.match(capturedTranscription.options.header['Content-Type'], /^multipart\/form-data; boundary=/);
+assert.equal(webSocketState.binaryBytes, binaryBefore + capturedPcm.byteLength);
+assert.equal(JSON.parse(webSocketState.sent.at(-1)).action, 'stop');
 assert.equal(page.chatMessages.at(-2).text, '今天天气怎么样？');
 assert.equal(page.chatMessages.at(-1).text, '这是语音问题的回答。');
 assert.equal(page.voicePhase, 'idle');
 assert.equal(page.voicePcmChunks.length, 0);
+webSocketState.closeAfterText = false;
 
 page.voiceOutputEnabled = true;
 const playersBefore = mediaPlayers.length;
@@ -380,7 +484,7 @@ await wait(80);
 assert.ok(mediaPlayers.length > playersBefore);
 assert.ok(
   mediaPlayers.slice(playersBefore).every((player) =>
-    player.src.startsWith('https://translate.google.com/translate_tts?')
+    player.src.startsWith('https://fanyi.baidu.com/gettts?')
   )
 );
 assert.equal(page.voicePhase, 'idle');
@@ -420,7 +524,7 @@ Object.assign(page, navigationState);
 
 page.newChat();
 page.startVoiceInput();
-await wait(20);
+await wait(40);
 assert.equal(page.voicePhase, 'listening');
 page.onBackPress();
 assert.equal(page.subPage, '');
@@ -461,7 +565,7 @@ console.log(JSON.stringify({
   threads: page.threads.length,
   activeThread: page.currentThreadId,
   chatEndpoint: page.getServiceUrl('/chat/completions'),
-  transcriptionEndpoint: 'https://notetakers.vipresearch.ca/stt/v1/transcribe',
-  ttsEndpoint: 'https://translate.google.com/translate_tts',
+  transcriptionEndpoint: 'wss://api.stt.ai/v1/stream',
+  ttsEndpoint: 'https://fanyi.baidu.com/gettts',
   api8Source: sourcePath
 }, null, 2));
