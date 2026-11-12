@@ -285,6 +285,8 @@ export default {
     this.destroyed = false;
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.recordWaveBars = this.buildRecordWaveBars();
     this.updateClock();
     this.clockTicker = setInterval(function () {
@@ -408,12 +410,12 @@ export default {
     if (this.pageIndex >= 2) {
       var shortHistory = this.pageIndex === 3 ||
         (this.pageIndex === 2 &&
-          this.taskHistory.length + this.threads.length + 1 <= 5);
-      if (event.direction === 'up' && !this.mainListAtEnd && !shortHistory) {
+          this.taskHistory.length + this.threads.length + 1 <= 3);
+      if (event.direction === 'up' && !this.mainListAtEndAtTouch && !shortHistory) {
         this.mainListAtStart = false;
         return;
       }
-      if (event.direction === 'down' && !this.mainListAtStart) {
+      if (event.direction === 'down' && !this.mainListAtStartAtTouch && !shortHistory) {
         this.mainListAtEnd = false;
         return;
       }
@@ -425,14 +427,23 @@ export default {
     }
   },
 
+  onRootTouchStart() {
+    this.mainListAtStartAtTouch = this.mainListAtStart;
+    this.mainListAtEndAtTouch = this.mainListAtEnd;
+  },
+
   mainListReachedStart() {
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
   },
 
   mainListReachedEnd() {
     this.mainListAtEnd = true;
     this.mainListAtStart = false;
+    this.mainListAtEndAtTouch = true;
+    this.mainListAtStartAtTouch = false;
   },
 
   queueMenuPage(index) {
@@ -455,6 +466,8 @@ export default {
     }
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.pageIndex = nextIndex;
   },
 
@@ -493,9 +506,9 @@ export default {
       this.closeSubPage();
       return true;
     }
-    this.stopVoiceResources();
-    this.resetRecordingState();
-    return false;
+    // Only the physical crown/Home button may leave the app.
+    // Keep active recording state intact when a back gesture is blocked.
+    return true;
   },
 
   onPageChange(event) {

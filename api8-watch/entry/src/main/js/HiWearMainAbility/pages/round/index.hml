@@ -1,4 +1,4 @@
-<div class="app" @swipe="handleSwipe">
+<div class="app" @swipe="handleSwipe" @touchstart="onRootTouchStart">
   <div if="{{mainVisible}}" class="main-shell">
     <div if="{{pageIndex === 0}}" class="page watch-face">
       <div class="face-head">

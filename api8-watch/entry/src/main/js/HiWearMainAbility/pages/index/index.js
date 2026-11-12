@@ -184,6 +184,8 @@ export default {
     this.menuSwipeTimer = null;
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.hardwareKeyAt = 0;
     this.hardwareKeySubscriber = null;
     this.hardwareKeySubscribing = false;
@@ -382,12 +384,12 @@ export default {
     // Scroll the list first; only an outward drag at its edge changes menus.
     if (this.pageIndex >= 2) {
       var shortList = this.pageIndex === 3 ||
-        (this.pageIndex === 2 && this.taskHistory.length + this.threads.length + 1 <= 5);
-      if (event.direction === 'up' && !this.mainListAtEnd && !shortList) {
+        (this.pageIndex === 2 && this.taskHistory.length + this.threads.length + 1 <= 3);
+      if (event.direction === 'up' && !this.mainListAtEndAtTouch && !shortList) {
         this.mainListAtStart = false;
         return;
       }
-      if (event.direction === 'down' && !this.mainListAtStart) {
+      if (event.direction === 'down' && !this.mainListAtStartAtTouch && !shortList) {
         this.mainListAtEnd = false;
         return;
       }
@@ -399,14 +401,23 @@ export default {
     }
   },
 
+  onRootTouchStart() {
+    this.mainListAtStartAtTouch = this.mainListAtStart;
+    this.mainListAtEndAtTouch = this.mainListAtEnd;
+  },
+
   mainListReachedStart() {
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
   },
 
   mainListReachedEnd() {
     this.mainListAtEnd = true;
     this.mainListAtStart = false;
+    this.mainListAtEndAtTouch = true;
+    this.mainListAtStartAtTouch = false;
   },
 
   queueMenuPage(index) {
@@ -437,6 +448,8 @@ export default {
     }
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.pageIndex = nextIndex;
     this.resetListScroll(nextIndex);
   },

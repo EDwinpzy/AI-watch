@@ -79,6 +79,7 @@ assert.ok(!/createAudioPlayer|startTts|playAudio|player\.play|\.wav\b/.test(page
 assert.ok(!/vibrator|startVibration|playTts/.test(pageSource), 'the watch must not start vibration or sound playback');
 assert.ok(!/@click="(goBack|closeSubPage|closeChat)"/.test(hml), 'visible navigation buttons are forbidden');
 assert.equal((hml.match(/@swipe=/g) || []).length, 1, 'swipe handling must exist only on the root container');
+assert.match(hml, /@touchstart="onRootTouchStart"/, 'root touch start must snapshot list edges');
 assert.match(hml, /id="recentList"/, 'recent list needs a stable id for scroll reset');
 assert.match(hml, /id="settingsList"/, 'settings list needs a stable id for scroll reset');
 assert.ok(
@@ -620,12 +621,38 @@ assert.equal(page.pageIndex, 2);
 page.handleSwipe({ direction: 'right' });
 assert.equal(page.pageIndex, 2);
 page.menuSwipeTimer = null;
+assert.equal(page.onBackPress(), true, 'the app must not exit from a main-page back gesture');
+
+const savedTaskHistory = page.taskHistory;
+page.taskHistory = [{}, {}, {}];
+page.pageIndex = 2;
+page.mainListAtStart = true;
+page.mainListAtEnd = false;
+page.mainListAtStartAtTouch = true;
+page.mainListAtEndAtTouch = false;
+page.handleSwipe({ direction: 'up' });
+await tick(260);
+assert.equal(page.pageIndex, 2, 'a long history list must scroll before paging');
+page.mainListAtEnd = true;
+page.mainListAtStart = false;
+page.handleSwipe({ direction: 'up' });
+await tick(260);
+assert.equal(page.pageIndex, 2, 'reaching the list edge during a gesture must not page');
+page.onRootTouchStart();
+page.handleSwipe({ direction: 'up' });
+await tick(260);
+assert.equal(page.pageIndex, 3, 'a new gesture from the list edge must page');
+page.taskHistory = savedTaskHistory;
+
+page.taskHistory = [];
+page.setPage(2);
 page.handleSwipe({ direction: 'up' });
 await tick(260);
 assert.equal(page.pageIndex, 3, 'a short history list must allow upward menu paging');
 page.handleSwipe({ direction: 'up' });
 await tick(260);
 assert.equal(page.pageIndex, 0, 'the short settings list must page without blocking');
+page.taskHistory = savedTaskHistory;
 
 assert.ok(
   !pageSource.split('\n').some((line) =>
