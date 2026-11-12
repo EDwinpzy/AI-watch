@@ -104,7 +104,7 @@
 - [x] 按住开始采集；普通松开、上滑至少 28 px 后松开都会提交一次。
 - [x] 语音球横向左滑会取消采集，离页不会误发语音。
 - [x] 系统中断触摸时丢弃本次输入，不提交残缺音频。
-- [x] `python -m unittest -v scripts.test_codex_bridge`：15 项通过。
+- [x] `python -m unittest -v scripts.test_codex_bridge`：18 项通过。
 - [x] 嵌套 `codex exec` 不再继承桌面端 Core 沙箱标记。
 - [x] 真实只读文件任务：20.76 秒完成并正确读取仓库。
 - [x] 六文档长任务：76.29 秒完成，超过 60 秒仍可轮询。
@@ -117,6 +117,7 @@
 - [x] `npm run check:api8`：108 项通过。
 - [x] 真实失败路径：缺令牌返回 `401`，空消息返回 `400`，并有固定 HTTP 回归测试。
 - [x] 错误 Magpie 地址：`0.53s` 进入失败状态，`audioUrl` 为空。
+- [x] ASR、Ollama、TTS 和旧语音链路日志均只记录字符数，不记录正文。
 - [x] 本机 `build-profile.json5` 未入库，模板不含证书路径或口令。
 - [x] API 8 干净 debug HAP 构建成功。
 - [x] v1.2.1 干净 release 构建与签名校验通过；44 entries，0 音频/GIF。

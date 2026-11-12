@@ -126,7 +126,7 @@ class Runtime:
         text = (result.get("text") or "").strip()
         self.log(event="asr_done", requestId=request_id, audioBytes=len(pcm),
                  wavBytes=wav_path.stat().st_size, elapsedMs=elapsed_ms,
-                 transcript=text, wavPath=str(wav_path.relative_to(ROOT)))
+                 transcriptChars=len(text), wavPath=str(wav_path.relative_to(ROOT)))
         return {"requestId": request_id, "transcript": text, "elapsedMs": elapsed_ms,
                 "wavPath": str(wav_path.relative_to(ROOT))}
 
@@ -145,8 +145,9 @@ class Runtime:
             payload = json.loads(response.read().decode("utf-8"))
         reply = (payload.get("response") or "").strip()
         elapsed_ms = round((time.perf_counter() - started) * 1000)
-        self.log(event="model_done", model=payload.get("model", model), prompt=prompt,
-                 reply=reply, elapsedMs=elapsed_ms, done=payload.get("done"))
+        self.log(event="model_done", model=payload.get("model", model),
+                 promptChars=len(prompt), replyChars=len(reply),
+                 elapsedMs=elapsed_ms, done=payload.get("done"))
         return {"model": payload.get("model", model), "reply": reply,
                 "elapsedMs": elapsed_ms, "done": bool(payload.get("done"))}
 
@@ -175,7 +176,7 @@ class Runtime:
             raise RuntimeError(f"TTS failed: {proc.stderr or proc.stdout}")
         text_path.unlink(missing_ok=True)
         elapsed_ms = round((time.perf_counter() - started) * 1000)
-        self.log(event="tts_done", text=text, elapsedMs=elapsed_ms,
+        self.log(event="tts_done", textChars=len(text), elapsedMs=elapsed_ms,
                  wavBytes=wav_path.stat().st_size, wavPath=str(wav_path.relative_to(ROOT)))
         return wav_path
 
@@ -300,7 +301,8 @@ class Handler(BaseHTTPRequestHandler):
                 tts = self.runtime.synthesize(chat["reply"])
                 total_ms = round((time.perf_counter() - pipeline_started) * 1000)
                 self.runtime.log(event="voice_pipeline_done", requestId=asr["requestId"],
-                                 totalMs=total_ms, transcript=asr["transcript"], reply=chat["reply"])
+                                 totalMs=total_ms, transcriptChars=len(asr["transcript"]),
+                                 replyChars=len(chat["reply"]))
                 self._send_json(HTTPStatus.OK, {"ok": True,
                     "transcript": asr["transcript"], "reply": chat["reply"],
                     "model": chat["model"], "audioUrl": f"/api/audio/{tts.name}",

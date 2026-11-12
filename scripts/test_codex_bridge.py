@@ -386,6 +386,11 @@ class HttpRouteTests(unittest.TestCase):
         root = Path(cls.temp.name)
         audio = root / "audio"
         audio.mkdir()
+        cls.logs = []
+
+        def capture_log(**payload) -> None:
+            cls.logs.append(payload)
+
         cls.runtime = SimpleNamespace(
             args=SimpleNamespace(
                 allow_client={"127.0.0.1"},
@@ -396,7 +401,7 @@ class HttpRouteTests(unittest.TestCase):
             ),
             codex=_FakeCodexManager(),
             audio_dir=audio,
-            log=lambda **payload: None,
+            log=capture_log,
             transcribe=lambda pcm: {
                 "requestId": "asr-1",
                 "transcript": "检查仓库结构",
@@ -441,6 +446,7 @@ class HttpRouteTests(unittest.TestCase):
             return exc.code, json.loads(exc.read().decode("utf-8"))
 
     def test_old_voice_route_still_works(self) -> None:
+        self.logs.clear()
         pcm = base64.b64encode(b"\x00\x00" * 64).decode("ascii")
         status, payload = self.request(
             "/api/voice",
@@ -449,6 +455,12 @@ class HttpRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["reply"], "旧语音链路正常")
         self.assertEqual(payload["transcript"], "检查仓库结构")
+        raw_log = json.dumps(self.logs, ensure_ascii=False)
+        self.assertNotIn("检查仓库结构", raw_log)
+        self.assertNotIn("旧语音链路正常", raw_log)
+        pipeline = [row for row in self.logs if row.get("event") == "voice_pipeline_done"]
+        self.assertEqual(pipeline[-1]["transcriptChars"], len("检查仓库结构"))
+        self.assertEqual(pipeline[-1]["replyChars"], len("旧语音链路正常"))
 
     def test_codex_routes_require_token(self) -> None:
         status, payload = self.request(
@@ -529,6 +541,78 @@ class ServiceRuntimeTests(unittest.TestCase):
         self.assertEqual(model.options["language"], "zh")
         self.assertFalse(model.options["condition_on_previous_text"])
         self.assertIn("简体中文", model.options["initial_prompt"])
+
+    def test_transcribe_log_redacts_transcript(self) -> None:
+        artifacts = SCRIPT_DIR.parent / "artifacts"
+        artifacts.mkdir(exist_ok=True)
+        logs = []
+        transcript = "这是敏感的语音转写"
+        with tempfile.TemporaryDirectory(dir=artifacts) as temp:
+            runtime = object.__new__(self.ai_service.Runtime)
+            runtime.audio_dir = Path(temp)
+            runtime.whisper_lock = threading.Lock()
+            runtime.log = lambda **payload: logs.append(payload)
+            runtime.args = SimpleNamespace(whisper_model="small")
+            runtime.whisper_model = SimpleNamespace(
+                device=SimpleNamespace(type="cpu"),
+                transcribe=lambda _path, **_options: {"text": transcript},
+            )
+            result = runtime.transcribe(b"\x00\x00" * 160)
+        self.assertEqual(result["transcript"], transcript)
+        self.assertNotIn(transcript, json.dumps(logs, ensure_ascii=False))
+        asr = [row for row in logs if row.get("event") == "asr_done"]
+        self.assertEqual(asr[-1]["transcriptChars"], len(transcript))
+
+    def test_chat_log_redacts_prompt_and_reply(self) -> None:
+        prompt = "敏感提示词"
+        reply = "敏感模型回答"
+        logs = []
+        runtime = object.__new__(self.ai_service.Runtime)
+        runtime.args = SimpleNamespace(ollama_timeout=1)
+        runtime.log = lambda **payload: logs.append(payload)
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "model": "fake-ollama",
+                    "response": reply,
+                    "done": True,
+                }, ensure_ascii=False).encode("utf-8")
+
+        with mock.patch.object(self.ai_service, "urlopen", return_value=FakeResponse()):
+            result = runtime.chat(prompt, "fake-ollama")
+        self.assertEqual(result["reply"], reply)
+        self.assertNotIn(prompt, json.dumps(logs, ensure_ascii=False))
+        self.assertNotIn(reply, json.dumps(logs, ensure_ascii=False))
+        model = [row for row in logs if row.get("event") == "model_done"]
+        self.assertEqual(model[-1]["promptChars"], len(prompt))
+        self.assertEqual(model[-1]["replyChars"], len(reply))
+
+    def test_tts_log_redacts_text(self) -> None:
+        text = "不应写入日志的语音正文"
+        logs = []
+        with tempfile.TemporaryDirectory(dir=SCRIPT_DIR.parent / "artifacts") as temp:
+            runtime = object.__new__(self.ai_service.Runtime)
+            runtime.audio_dir = Path(temp)
+            runtime.args = SimpleNamespace(tts_timeout=1)
+            runtime.log = lambda **payload: logs.append(payload)
+
+            def fake_run(*_args, **kwargs):
+                Path(kwargs["env"]["NOVA_TTS_OUT"]).write_bytes(b"RIFF")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(self.ai_service.subprocess, "run", side_effect=fake_run):
+                result = runtime.synthesize(text)
+            self.assertTrue(result.exists())
+        self.assertNotIn(text, json.dumps(logs, ensure_ascii=False))
+        tts = [row for row in logs if row.get("event") == "tts_done"]
+        self.assertEqual(tts[-1]["textChars"], len(text))
 
 
 def main() -> None:
