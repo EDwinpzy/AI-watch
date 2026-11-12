@@ -84,12 +84,13 @@ npm run check:core
 npm run check:api8
 ```
 
-API 8 检查当前为 104 项，包含：
+API 8 检查当前为 111 项，包含：
 
 - 无媒体播放导入、无播放路径、无 WAV。
 - 无可见返回/关闭按钮，使用左滑逐级返回、主页面上下切页。
 - 默认 Codex、1.5 秒轮询、离页停止轮询、取消接口和令牌头。
 - JSON 请求使用 `@ohos.net.http`，创建任务使用 `200` 并拒绝非 2xx。
+- 长录音 PCM 使用可让出 JS 线程的分块 Base64 编码，避免 60 秒录音提交时卡死。
 - 设置页固定静音文案和聊天/录音任务状态。
 
 候选 HAP 与签名材料只保存在本机 `signing/`，不纳入 Git。
@@ -108,17 +109,19 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
 
 ## v1.2.1 发布候选构建
 
-2026-11-12 从干净提交 `6674270` 使用 Node 14 生成并通过签名校验：
+2026-11-12 从干净提交 `d6117ba` 使用 Node 14 生成并通过签名校验：
 
 ```text
 文件：signing/NOVA-Watch-AI-fa-api8-v1.2.1-release.hap
-大小：1,198,262 bytes
-SHA-256：DD50E6C2EEFE8829FF1A522312B775227D80A0B40DD432DAC29404305A3CAD2C
+大小：1,201,796 bytes
+SHA-256：25B09E4423E9009B952AF9B1ECF2607FF32B7A7FD142F69A3103B39B4D1F73D9
 签名：hapsigntoolv2 verify success
 包内容：44 entries；WAV / MP3 / OGG / AAC / M4A / GIF 均为 0
 ```
 
-该候选包尚未安装到手表；真机手势、长轮询、取消和圆屏裁切验收完成后再发布。
+该候选包已安装到 HUAWEI WATCH 4，真机完成 60 秒录音自动结束、异步任务创建、
+超过 60 秒的轮询、结果与转写页、复制、继续追问、任务历史、401、并发冲突、
+取消、后端离线提示、Ollama/Codex 模式切换和手势返回验收；手表全程静音。
 
 ## 静音构建校验（v1.2.0 历史记录）
 
