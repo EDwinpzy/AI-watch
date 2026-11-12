@@ -95,24 +95,42 @@ POST /api/codex/task/{taskId}/cancel
 
 ## 旧链路
 
-设置页仍可在 `Codex` 与 `Ollama` 间切换。Ollama 模式复用旧
-`POST /api/voice`；手表读取 `transcript` 和 `reply` 并显示为文字，
-忽略服务端兼容返回的音频地址。
+手表默认使用内置 OpenAI Compatible 模型，不再显示 `Codex` / `Ollama`
+后端切换。旧 `POST /api/voice` 仅作为服务端兼容接口保留；手表读取
+`transcript` 和 `reply` 并显示为文字，忽略兼容返回的音频地址。
+
+经典页的 `POST /api/asr` 使用 JSON 请求：
+
+```json
+{
+  "pcmBase64": "<16 kHz mono S16LE PCM>",
+  "sampleRate": 16000
+}
+```
+
+服务端仍兼容旧的原生 `application/octet-stream` PCM 请求。手表优先使用
+JSON/base64，避免 API 8 上直接发送 `ArrayBuffer` 时回调不返回。
 
 ## 圆环页链路
 
-- 聊天：`POST https://magpie-relay.pengzhiyuan0724.workers.dev/v1/chat/completions`
+- 聊天：`POST http://<PC-LAN-IP>:8787/v1/chat/completions`，由 PC 服务转发到
+  `http://127.0.0.1:3425/v1` 的 `workbuddy/deepseek-v4.1-flash`
+- Codex：`POST /api/codex/voice`、`POST /api/codex/task`、状态轮询与取消
 - STT：`wss://api.stt.ai/v1/stream`，16 kHz、单声道、S16LE PCM
 - TTS：`https://fanyi.baidu.com/gettts`，默认关闭
 
-Base URL、模型和 API Key 通过本地生成文件
-`pages/round/built-in-config.js` 注入。该文件由
-`scripts/prepare-built-in-config.ps1` 创建并被 Git 忽略；仓库只保存读取逻辑，
-不保存真实凭据。圆环页不显示服务地址或密钥编辑入口。
+Magpie 上游地址、模型和 API Key 只写入 PC 本地
+`.secrets/built-in-service.json`。HAP 只接收局域网中继地址、模型名称和
+独立客户端令牌，生成文件为
+`api8-watch/entry/src/main/js/HiWearMainAbility/built-in-config.js`；
+该文件由 `scripts/prepare-built-in-config.ps1` 创建并被 Git 忽略。
+两套界面都不显示服务地址、密钥或字段编辑入口。
+经典页默认发送 `max_tokens=128`、`temperature=0.2` 和
+`reasoning_effort=none`，以控制首字等待时间。
 
 ## 错误反馈
 
-- 未填令牌：本地直接提示。
+- 内置模型不可用：检查局域网中继是否启动。
 - 401：令牌无效。
 - 409：已有任务执行。
 - 后端不可用：数秒内进入失败状态。

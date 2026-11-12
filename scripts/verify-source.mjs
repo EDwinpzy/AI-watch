@@ -104,7 +104,11 @@ assert.ok(
 assert.deepEqual(api8Config.app.apiVersion, { compatible: 8, target: 8 });
 assert.deepEqual(api8Config.module.deviceType, ['wearable']);
 assert.match(api8RootHvigorfile, /export \{\s*legacyAppTasks\s*\}/);
-assert.match(api8EntryHvigorfile, /export \{\s*legacyHapTasks\s*\}/);
+assert.match(
+  api8EntryHvigorfile,
+  /export function watchEntryTasks\(module: any\)/,
+  'API 8 entry must expose the hardware-key aware Hvigor entry'
+);
 assert.ok(exists('api8-watch/entry/package.json'), 'legacy FA module package.json is missing');
 assert.ok(
   !/border-radius\s*:\s*[^;]*%/.test(api8Css),
@@ -128,15 +132,26 @@ assert.ok(
 );
 assert.ok(api8Hml.includes('始终静音') && api8Hml.includes('不影响睡眠'), 'silent-mode promise is missing');
 assert.ok(
-  api8PageSource.includes("voiceMode: 'codex'") &&
-  api8PageSource.includes("'/api/codex/voice'") &&
-  api8PageSource.includes("'/api/codex/task'") &&
-  api8PageSource.includes("'/cancel'") &&
-  api8PageSource.includes("'X-Nova-Token'"),
-  'Codex async client contract is incomplete'
+  api8PageSource.includes("from '../../built-in-config'") &&
+  api8PageSource.includes("voiceMode: 'magpie'") &&
+  api8PageSource.includes("MODEL_BASE_URL") &&
+  api8PageSource.includes("'/chat/completions'") &&
+  api8PageSource.includes("'Authorization': 'Bearer ' + MODEL_API_KEY"),
+  'built-in Magpie model contract is incomplete'
 );
-assert.ok(api8Hml.includes('访问令牌') && api8PageSource.includes("codexToken: ''"), 'token configuration is missing');
-assert.ok(api8Hml.includes('只读仓库') && api8PageSource.includes("codexRepoId: 'watch'"), 'read-only repo selection is missing');
+assert.ok(
+  !api8Hml.includes('服务配置') &&
+  !api8Hml.includes('访问令牌') &&
+  !api8Hml.includes('openApiSettings') &&
+  !api8Hml.includes('openField('),
+  'service configuration screens must stay removed'
+);
+assert.ok(
+  !api8PageSource.includes('apiBaseUrl:') &&
+  !api8PageSource.includes('apiKey:') &&
+  !api8PageSource.includes('openApiSettings('),
+  'watch-side service editor state must stay removed'
+);
 assert.ok(!/@click="(goBack|closeSubPage|closeChat)"/.test(api8Hml), 'visible navigation buttons are forbidden');
 assert.ok(api8Hml.includes('@swipe="handleSwipe"'), 'watch gesture navigation is missing');
 assert.ok(
@@ -158,8 +173,8 @@ assert.deepEqual(
   'both watch interfaces must be registered'
 );
 assert.ok(
-  api8PageSource.includes("from '@ohos.router'") &&
-  api8PageSource.includes("router.push({ url: 'pages/round/index' })"),
+  api8PageSource.includes("from '@system.router'") &&
+  api8PageSource.includes("router.push({ uri: 'pages/round/index' })"),
   'classic interface must open the round interface'
 );
 assert.ok(
@@ -168,9 +183,9 @@ assert.ok(
   'classic settings must expose the interface switch'
 );
 assert.ok(
-  roundPageSource.includes("from '@ohos.router'") &&
+  roundPageSource.includes("from '@system.router'") &&
   roundPageSource.includes('router.back()') &&
-  roundPageSource.includes("from './built-in-config'"),
+  roundPageSource.includes("from '../../built-in-config'"),
   'round interface navigation or local config import is missing'
 );
 assert.ok(
@@ -180,7 +195,6 @@ assert.ok(
 );
 assert.ok(
   roundHml.includes('Apple Watch') &&
-  roundHml.includes('1.2.2') &&
   roundCss.includes('.activity-ring'),
   'round interface visual identity is incomplete'
 );
@@ -190,14 +204,62 @@ assert.ok(
   'round interface must keep the service connection built in'
 );
 assert.ok(
+  roundPageSource.includes('startRecording()') &&
+  roundPageSource.includes('pauseRecording()') &&
+  roundPageSource.includes('markRecording()') &&
+  roundHml.includes('开始录音') &&
+  roundHml.includes('标记'),
+  'round recording-summary workflow is incomplete'
+);
+assert.ok(
+  roundPageSource.includes('submitCodexVoice(') &&
+  roundPageSource.includes('submitCodexText(') &&
+  roundPageSource.includes('startCodexPolling(') &&
+  roundPageSource.includes('cancelCodexTask(') &&
+  roundHml.includes('class="task-status-chip') &&
+  roundHml.includes('停止任务'),
+  'round Codex task workflow is incomplete'
+);
+assert.ok(
+  roundPageSource.includes('beginTranscriptEdit(') &&
+  roundPageSource.includes('copyResult(') &&
+  roundPageSource.includes('continueFromResult(') &&
+  roundHml.includes('复制') &&
+  roundHml.includes('继续追问'),
+  'round result operations are incomplete'
+);
+assert.ok(
+  roundPageSource.includes('toggleHaptics(') &&
+  !roundPageSource.includes('toggleVoiceMode(') &&
+  roundHml.includes('触感反馈') &&
+  roundHml.includes('始终静音') &&
+  !roundHml.includes('语音后端'),
+  'round settings must stay minimal and backend-free'
+);
+assert.ok(
+  !/@click="(goBack|closeSubPage|closeChat)"/.test(roundHml),
+  'round visible navigation buttons are forbidden'
+);
+assert.ok(
+  roundPageSource.includes('event.direction === \'left\''),
+  'round subpage must close with a left swipe'
+);
+assert.ok(
+  roundPageSource.includes('voiceOutputEnabled: false'),
+  'round TTS must stay off by default'
+);
+assert.ok(
   !/\bsk-[A-Za-z0-9]{20,}\b/.test(roundPageSource),
   'built-in credentials must never be tracked in the round page source'
 );
 assert.ok(
   gitignore.includes(
-    'api8-watch/entry/src/main/js/HiWearMainAbility/pages/round/built-in-config.js'
+    'api8-watch/entry/src/main/js/HiWearMainAbility/built-in-config.js'
   ) &&
-  exists('scripts/prepare-built-in-config.ps1'),
+  exists('scripts/prepare-built-in-config.ps1') &&
+  read('scripts/prepare-built-in-config.ps1').includes('HiWearMainAbility') &&
+  read('scripts/prepare-built-in-config.ps1').includes('codexBaseUrl') &&
+  read('scripts/prepare-built-in-config.ps1').includes('codexToken'),
   'local built-in config generation is not protected'
 );
 

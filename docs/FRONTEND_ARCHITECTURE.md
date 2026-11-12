@@ -17,7 +17,7 @@
 ```text
 0 首页
 1 录音摘要
-2 最近任务
+2 最近对话
 3 设置
 ```
 
@@ -29,44 +29,44 @@ answer  语音回答
 task    Codex 任务状态
 result  任务结果
 chat    文字对话
-api     服务配置
-field   字段编辑
 ```
 
 经典 Aurora 页面集中在 API 8 `pages/index/index.*`。Apple Watch 圆环界面
 独立位于 `pages/round/index.*`，通过 `@ohos.router` 从设置页双向切换。
-两套页面都没有 WebView，也不会在切换时删除另一套实现。
+两套页面都没有 WebView，也不会在切换时删除另一套实现。圆环页已补齐
+60 秒录音摘要、Codex 任务轮询、任务历史、结果转写编辑和语音回答页。
+经典 Aurora 不绘制应用内时间/日期/信号/电池状态区，主页面按
+“一屏一主任务”收敛，只保留核心信息和操作。
 
 ## 3. 状态
 
 主要状态：
 
 ```text
-clockText / dateText
 pageIndex / mainVisible / subPage
 voiceMode / voiceState / voiceTranscriptText
 recordRunning / recordSeconds / recordHasProgress
 codexTaskId / codexStatus / codexStage / codexMessage
 taskHistory / threads / currentThreadId
-apiBaseUrl / codexToken / codexRepoId
+builtInConfig / model state
+圆环表盘：clockText / dateText
 ```
 
-服务地址与令牌只保存在当前页面内存。页面重建后需重新输入。
-圆环页的内置服务配置来自本地构建注入文件，不进入 Git。
+模型地址、模型名称和局域网客户端令牌在构建时注入；两套界面都不显示服务配置
+或字段编辑入口。上游模型密钥只保存在 PC 本地，不进入 HAP。
 
 ## 4. 生命周期
 
-- `onInit` 初始化时钟、波形和计时器。
+- `onInit` 初始化波形和计时器；圆环表盘单独维护自己的时间。
 - `onHide` 停止 Codex 轮询。
 - `onShow` 在任务页恢复轮询。
-- `onDestroy` 清理时钟、录音、语音和网络资源。
+- `onDestroy` 清理录音、语音和网络资源。
 - 轮询间隔 `1500 ms`，完成/失败/取消后停止。
 
 ## 5. 手势
 
 - 主页面上下滑切换。
 - 子页左滑逐级返回。
-- 字段编辑左滑先关闭编辑层。
 - 列表滚动优先，滚到端点后才把手势交给菜单。
 - 不显示返回、关闭或取消导航按钮。
 

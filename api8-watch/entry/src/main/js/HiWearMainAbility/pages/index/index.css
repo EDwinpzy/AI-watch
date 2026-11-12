@@ -869,8 +869,8 @@
 
 .answer-user-card,
 .answer-assistant-card {
-  width: 314px;
-  margin-left: 76px;
+  width: 348px;
+  margin-left: 0;
   padding: 12px 15px;
   border-radius: 19px;
   flex-direction: column;
@@ -913,7 +913,7 @@
 }
 
 .answer-user-text {
-  width: 284px;
+  width: 318px;
   margin-top: 5px;
   color: #e5f1f7;
   font-size: 12px;
@@ -921,7 +921,7 @@
 }
 
 .answer-assistant-text {
-  width: 284px;
+  width: 318px;
   margin-top: 7px;
   color: #e5eef1;
   font-size: 13px;
@@ -929,7 +929,7 @@
 }
 
 .answer-silent {
-  width: 284px;
+  width: 318px;
   margin-top: 8px;
   color: #6c8188;
   font-size: 8px;
@@ -1092,7 +1092,7 @@
 
 .segmented-control {
   position: absolute;
-  left: 82px;
+  left: 92px;
   top: 91px;
   width: 282px;
   height: 42px;
@@ -1224,8 +1224,8 @@
 }
 
 .transcript-card {
-  width: 333px;
-  min-height: 150px;
+  width: 348px;
+  min-height: 104px;
   padding: 12px 14px;
   border: 1px solid rgba(139, 199, 214, 0.12);
   border-radius: 18px;
@@ -1233,7 +1233,7 @@
 }
 
 .transcript-text {
-  width: 305px;
+  width: 318px;
   color: #d8e6e9;
   font-size: 11.5px;
   line-height: 18px;
@@ -1306,6 +1306,7 @@
   width: 300px;
   height: 52px;
   margin-left: 83px;
+  margin-top: 54px;
   color: #6e8188;
   font-size: 10px;
   line-height: 22px;
@@ -1324,7 +1325,7 @@
 }
 
 .chat-input {
-  width: 233px;
+  width: 225px;
   height: 47px;
   padding: 0 13px;
   border: 1px solid rgba(134, 194, 208, 0.15);
@@ -2871,4 +2872,458 @@
   0%, 100% { transform: scale(0.988); opacity: 0.48; }
   46% { transform: scale(1.024); opacity: 0.86; }
   72% { transform: scale(1.008); opacity: 0.62; }
+}
+
+/* Quiet density pass: larger targets, one primary task per page, no in-app status bar. */
+
+.page-title,
+.fixed-page-title {
+  top: 44px;
+  font-size: 30px;
+}
+
+/* Home */
+
+.home-orb {
+  left: 119px;
+  top: 18px;
+  width: 228px;
+  height: 183px;
+}
+
+.home-wordmark {
+  top: 204px;
+  height: 34px;
+  font-size: 30px;
+}
+
+.home-task {
+  left: 113px;
+  top: 240px;
+  width: 240px;
+  height: 28px;
+}
+
+.home-task-text {
+  font-size: 13.5px;
+}
+
+.home-actions {
+  left: 43px;
+  top: 274px;
+  width: 380px;
+  height: 104px;
+}
+
+.hero-action {
+  width: 184px;
+  height: 104px;
+  border-radius: 52px;
+}
+
+.hero-record {
+  margin-left: 12px;
+}
+
+.hero-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 9px;
+}
+
+.hero-label {
+  font-size: 25px;
+}
+
+/* Recording */
+
+.record-stage {
+  top: 88px;
+  height: 184px;
+}
+
+.record-wavebox {
+  top: 44px;
+  height: 76px;
+}
+
+.record-ring {
+  left: 92px;
+  top: 4px;
+  width: 168px;
+  height: 168px;
+  border-radius: 84px;
+}
+
+.record-time {
+  height: 36px;
+  font-size: 32px;
+}
+
+.record-state {
+  width: 160px;
+  height: 26px;
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.record-start-wrap {
+  top: 306px;
+  height: 60px;
+}
+
+.record-start {
+  width: 272px;
+  height: 58px;
+}
+
+.record-actions {
+  top: 306px;
+  height: 98px;
+}
+
+.round-action {
+  width: 88px;
+  height: 98px;
+  margin-left: 9px;
+  margin-right: 9px;
+}
+
+.round-disc {
+  width: 70px;
+  height: 70px;
+  border-radius: 35px;
+}
+
+.round-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.round-label {
+  width: 88px;
+  height: 24px;
+  margin-top: 5px;
+  font-size: 16px;
+}
+
+/* Lists */
+
+.wrist-list {
+  top: 100px;
+  height: 320px;
+}
+
+.list-item,
+.chat-item,
+.answer-item,
+.result-list-item {
+  margin-bottom: 6px;
+}
+
+.glass-row,
+.row-inner {
+  height: 74px;
+}
+
+.glass-row {
+  border-radius: 37px;
+}
+
+.row-icon-box {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 19px;
+}
+
+.row-icon-img {
+  width: 20px;
+  height: 20px;
+}
+
+.row-label {
+  height: 33px;
+  font-size: 22px;
+  line-height: 33px;
+}
+
+.row-subtitle {
+  height: 24px;
+  font-size: 15px;
+}
+
+.row-badge {
+  height: 27px;
+  font-size: 14px;
+  line-height: 26px;
+}
+
+.row-chevron {
+  font-size: 27px;
+}
+
+.switch-track {
+  width: 60px;
+  min-width: 60px;
+  height: 34px;
+  border-radius: 17px;
+}
+
+.switch-knob {
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+}
+
+.settings-note {
+  position: absolute;
+  left: 76px;
+  top: 82px;
+  width: 314px;
+  height: 18px;
+  z-index: 88;
+  color: rgba(220, 247, 250, 0.58);
+  font-size: 13px;
+  text-align: center;
+}
+
+.settings-page .wrist-list {
+  top: 108px;
+  height: 312px;
+}
+
+.hardware-key-sink {
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* Shared actions */
+
+.pill-label {
+  font-size: 19px;
+}
+
+.button-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* Voice */
+
+.voice-ring-wrap {
+  top: 74px;
+}
+
+.voice-cta {
+  height: 22px;
+  line-height: 22px;
+  font-size: 17px;
+}
+
+.voice-live {
+  top: 274px;
+  height: 24px;
+}
+
+.voice-live-text {
+  font-size: 15px;
+}
+
+.voice-hub {
+  top: 304px;
+}
+
+.voice-hub-row {
+  width: 276px;
+  height: 58px;
+  margin-bottom: 6px;
+}
+
+.hub-icon-box {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 17px;
+}
+
+.hub-title {
+  height: 24px;
+  font-size: 19px;
+  line-height: 24px;
+}
+
+.hub-subtitle {
+  height: 19px;
+  font-size: 14px;
+}
+
+/* Voice answer */
+
+.answer-scroll {
+  top: 96px;
+  height: 268px;
+}
+
+.answer-user-text {
+  font-size: 17px;
+  line-height: 25px;
+}
+
+.answer-assistant-text {
+  font-size: 17px;
+  line-height: 25px;
+}
+
+.answer-actions {
+  top: 368px;
+  height: 58px;
+}
+
+.answer-actions .primary-pill,
+.answer-actions .secondary-pill {
+  height: 58px;
+}
+
+/* Codex task */
+
+.task-orbit {
+  top: 86px;
+}
+
+.task-stage {
+  top: 252px;
+  font-size: 27px;
+}
+
+.task-message {
+  top: 286px;
+  font-size: 14.5px;
+}
+
+.task-card {
+  top: 312px;
+  height: 64px;
+  padding: 10px 13px;
+}
+
+.task-card-text {
+  font-size: 15.5px;
+  line-height: 21px;
+}
+
+.task-stop {
+  top: 384px;
+  height: 52px;
+}
+
+/* Result */
+
+.segmented-control {
+  top: 84px;
+  height: 46px;
+}
+
+.segment-indicator,
+.segment-option {
+  height: 38px;
+}
+
+.segment-label {
+  font-size: 17.5px;
+}
+
+.result-scroll {
+  top: 146px;
+  height: 200px;
+}
+
+.result-point-text {
+  font-size: 17px;
+  line-height: 24px;
+}
+
+.transcript-text {
+  font-size: 16.5px;
+  line-height: 24px;
+}
+
+.result-actions {
+  top: 366px;
+  height: 58px;
+}
+
+.result-actions .primary-pill,
+.result-actions .secondary-pill {
+  height: 58px;
+}
+
+/* Chat */
+
+.chat-scroll {
+  top: 92px;
+  height: 250px;
+}
+
+.message-author {
+  font-size: 13px;
+}
+
+.message-text {
+  font-size: 17px;
+  line-height: 25px;
+}
+
+.chat-empty {
+  font-size: 16px;
+}
+
+.chat-composer {
+  top: 352px;
+  height: 56px;
+}
+
+.chat-input {
+  height: 56px;
+  font-size: 17px;
+}
+
+.chat-send {
+  width: 56px;
+  height: 56px;
+}
+
+/* Service and field */
+
+.api-save {
+  top: 366px;
+  height: 56px;
+}
+
+.field-title {
+  font-size: 30px;
+}
+
+.field-step {
+  font-size: 15px;
+}
+
+.field-hint {
+  font-size: 15px;
+}
+
+.field-input {
+  font-size: 19px;
+}
+
+.field-save {
+  height: 58px;
+}
+
+.subpage-hint {
+  font-size: 14px;
 }

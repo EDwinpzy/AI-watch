@@ -10,16 +10,23 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 - 两个注册页面：`pages/index/index` 经典 Aurora 界面、
   `pages/round/index` Apple Watch 圆环界面。
 - 设置页可双向切换界面，不覆盖或删除另一套实现。
-- 4 个主页面：首页、录音摘要、最近任务、设置。
-- 7 个子页面：语音、回答、任务、结果、文字聊天、服务配置、字段编辑。
-- 默认语音后端为 `codex`，同时保留 Ollama 即时链路。
-- Codex 任务使用 `/api/codex/voice`、`/api/codex/task`、状态轮询与取消。
-- 健康检查、Codex 异步请求和旧 Ollama 链路统一使用 `@ohos.net.http`。
-- 创建任务使用 HTTP `200`，规避 API 8 `net.http` 对 `202` 的连接异常误判。
+- 两套界面均为 4 个主页面：首页、录音摘要、最近、设置。
+- 经典 Aurora 不绘制应用内时间/日期/信号/电池状态区；首页只保留
+  两个主入口，其他页面按一屏一主任务收敛。
+- 圆环页子页面：语音回答、Codex 任务、摘要结果、文字聊天。
+- 设置页仅保留静音状态、触感反馈和界面切换，不显示服务配置或后端切换。
+- 文字、语音和录音摘要默认使用内置 OpenAI Compatible 模型。
+- 手表通过局域网 `/v1/chat/completions` 访问 PC 中继，中继再转发到
+  `http://127.0.0.1:3425/v1`；默认模型为
+  `workbuddy/deepseek-v4.1-flash`。通过 `/api/asr` 调用 Whisper；经典页
+  以上传 JSON `pcmBase64` 为主，服务端兼容原始 PCM。Magpie API Key 不进入 HAP。
+- 经典页前台时，右下实体键实际映射为 `KEYCODE_SOS`（265）；shell activity
+  同时兼容 `KEYCODE_BUTTON_9` / F26（196），并转为
+  `com.aiwatch.watch.action.START_VOICE`：第一次按下开始语音，第二次按下
+  结束并提交。
 - PC 服务默认使用 Whisper `small`、简体中文提示词和启动预热。
-- `X-Nova-Token` 只保存在当前页面内存。
 - 经典页无 `@ohos.multimedia.media`、无 AudioPlayer、无 WAV 下载和播放路径。
-- 圆环页使用内置 Magpie、STT.ai WebSocket 和可选 TTS；TTS 默认关闭。
+- 圆环页保留内置模型、STT 兼容代码和可选 TTS；TTS 默认关闭。
 
 ## 静音约束
 
@@ -46,7 +53,6 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 使用 API 8 SDK、Node 14 和工程内 Hvigor：
 
 ```powershell
-$env:MAGPIE_API_KEY='<local secret>'
 powershell -ExecutionPolicy Bypass -File scripts\prepare-built-in-config.ps1
 
 $signing='signing\build-profile.signing.json5'
@@ -71,10 +77,13 @@ $hvigor=Join-Path (Resolve-Path '.').Path 'node_modules\@ohos\hvigor\bin\hvigor.
 entry/build/default/outputs/default/entry-default-signed.hap
 ```
 
-`prepare-built-in-config.ps1` 也接受已被 Git 忽略的
-`.secrets/built-in-service.json`。生成的
-`pages/round/built-in-config.js` 同样被忽略；干净检出不能在没有本地密钥时
-完成 HAP 构建，但源码、核心和页面模拟测试仍可运行。
+`prepare-built-in-config.ps1` 读取已被 Git 忽略的
+`.secrets/built-in-service.json`。必填字段为 `apiKey`、`baseUrl` 和 `model`；
+手表使用 `clientBaseUrl` 和 `clientToken`，因此 Magpie API Key 不会写入 HAP。
+`codexBaseUrl`、`codexToken` 和 `codexRepoId` 仅用于保留的服务端兼容路径。
+生成文件为
+`api8-watch/entry/src/main/js/HiWearMainAbility/built-in-config.js`，同样被忽略。
+干净检出不能在没有本地密钥时完成 HAP 构建，但源码和页面模拟测试仍可运行。
 
 ## 安装
 
@@ -97,26 +106,19 @@ npm run check:core
 npm run check:api8
 ```
 
-API 8 检查当前包含经典页 115 项、圆环页 121 项，覆盖：
+API 8 检查当前包含经典页 135 项、圆环页 220 项，覆盖：
 
 - 无媒体播放导入、无播放路径、无 WAV。
-- 两套页面注册、双向路由、圆环页内置服务和无跟踪密钥。
+- 两套页面注册、双向路由、内置服务和无跟踪密钥。
 - 无可见返回/关闭按钮，使用左滑逐级返回、主页面上下切页。
-- 默认 Codex、1.5 秒轮询、离页停止轮询、取消接口和令牌头。
+- 默认内置模型、OpenAI Compatible 请求头、录音摘要和本地转写链路。
 - JSON 请求使用 `@ohos.net.http`，创建任务使用 `200` 并拒绝非 2xx。
 - 长录音 PCM 使用可让出 JS 线程的分块 Base64 编码，避免 60 秒录音提交时卡死。
 - 设置页固定静音文案和聊天/录音任务状态。
+- 经典页无应用内状态栏、双主入口、低密度页面和放大后的触控尺寸。
+- 圆环页录音暂停/继续/标记、任务重开轮询、结果转写编辑、复制和继续追问。
 
-2026-11-12 双界面本地编译候选（未签名）：
-
-```text
-文件：entry/build/default/outputs/default/entry-default-unsigned.hap
-大小：1,772,339 bytes
-SHA-256：6C3C7A765EABB2B9D1EBAF55392DF3F48D453ABE3BEA427A190C0318B181845C
-包内容：经典页、圆环页、本地注入配置均已打包
-```
-
-该结果证明编译和打包路径；新版双向页面切换仍需签名后在真机复核。
+签名后真机验收以当前 HAP 的构建输出为准。
 
 候选 HAP 与签名材料只保存在本机 `signing/`，不纳入 Git。
 `build-profile.json5` 也由 `build-profile.example.json5` 生成为本机忽略文件；

@@ -30,7 +30,7 @@ powershell -ExecutionPolicy Bypass -File scripts\start-ai-service.ps1 `
 
 - 绑定当前活动局域网 IPv4，默认端口 `8787`。
 - 允许手表 IP、回环地址和本机服务 IP。
-- 生成 28 位访问令牌并打印服务地址。
+- 生成或读取访问令牌，打印服务地址但不输出令牌明文。
 - 启动时预热 Whisper，首个语音请求不再承担模型加载时间。
 - 固定 Codex 模型与 Magpie 后端。
 
@@ -50,6 +50,17 @@ openai-whisper small
 commandcode-plan/deepseek/deepseek-v4.1-flash
 ```
 
+默认手表对话模型：
+
+```text
+workbuddy/deepseek-v4.1-flash
+```
+
+手表请求固定 `max_tokens=128`、`temperature=0.2`、
+`reasoning_effort=none`，本地中继将参数透传给 Magpie。实测本机
+`group/ai-watch` 在低输出上限下约 33 秒且可能返回空文本；
+`workbuddy/deepseek-v4.1-flash` 约 1.6–2.3 秒。
+
 默认后端：
 
 ```text
@@ -65,8 +76,9 @@ http://127.0.0.1:3425/v1
 | POST | `/api/codex/task` | Token | 文字 prompt → 创建任务 |
 | GET | `/api/codex/task/{id}` | Token | 轮询状态、阶段、结果和耗时 |
 | POST | `/api/codex/task/{id}/cancel` | Token | 标记取消并结束子进程树 |
+| POST | `/v1/chat/completions` | 客户端令牌 | OpenAI Compatible 对话转发 |
 | POST | `/api/chat` | 客户端 allowlist | 旧 Ollama 文本链路 |
-| POST | `/api/asr` | 客户端 allowlist | 旧原始 PCM 转写链路 |
+| POST | `/api/asr` | 客户端 allowlist | JSON Base64 PCM 转写，兼容旧原始 PCM |
 | POST | `/api/voice` | 客户端 allowlist | 旧 ASR + Ollama + TTS 兼容链路 |
 | POST | `/api/tts` | 客户端 allowlist | 旧兼容 TTS 端点 |
 

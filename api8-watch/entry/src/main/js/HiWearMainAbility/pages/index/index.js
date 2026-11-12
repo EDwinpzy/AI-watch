@@ -2,7 +2,9 @@ import pasteboard from '@ohos.pasteboard';
 import audio from '@ohos.multimedia.audio';
 import featureAbility from '@ohos.ability.featureAbility';
 import http from '@ohos.net.http';
-import router from '@ohos.router';
+import router from '@system.router';
+import commonEvent from '@ohos.commonEvent';
+import builtInConfig from '../../built-in-config';
 
 function pad2(value) {
   return value < 10 ? '0' + value : '' + value;
@@ -25,14 +27,17 @@ var VOICE_CANCEL_SLIDE_X_PX = 32;
 var RECORD_MAX_SECONDS = 60;
 var CODEX_POLL_MS = 1500;
 var BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-var LOCAL_SERVICE_URL = 'http://192.168.1.129:8787';
-var LOCAL_MODEL = 'translategemma:4b';
-var WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+var LOCAL_SERVICE_URL = String(builtInConfig.codexBaseUrl || 'http://192.168.1.129:8787')
+  .replace(/\/+$/, '');
+var MODEL_BASE_URL = String(builtInConfig.baseUrl || '')
+  .replace(/\/+$/, '');
+var MODEL_API_KEY = builtInConfig.apiKey || '';
+var MODEL_NAME = builtInConfig.model || 'workbuddy/deepseek-v4.1-flash';
+var MODEL_SYSTEM_PROMPT = '你是圆形手表上的中文智能助手。回答简短、自然，优先控制在 80 个汉字以内。';
+var HARDWARE_KEY_EVENT = 'com.aiwatch.watch.action.START_VOICE';
 
 export default {
   data: {
-    clockText: '00:00',
-    dateText: '',
     pageIndex: 0,
     mainVisible: true,
     subPage: '',
@@ -48,7 +53,7 @@ export default {
     voiceEndArmed: false,
     voiceResponseText: '',
     voiceAnswerText: '',
-    voiceMode: 'codex',
+    voiceMode: 'magpie',
     micMuted: false,
     micLabel: '麦克风',
     voiceInputLevel: 0,
@@ -64,6 +69,7 @@ export default {
     recordStatus: '轻触开始录音',
     recordPaused: false,
     recordHasProgress: false,
+    recordSubmitting: false,
     recordControlLabel: '开始录音',
     recordInputLevel: 0,
     recordWaveBars: [],
@@ -71,8 +77,8 @@ export default {
     resultTab: 'summary',
     recordText: '',
 
-    codexToken: '',
-    codexRepoId: 'watch',
+    codexToken: builtInConfig.codexToken || '',
+    codexRepoId: builtInConfig.codexRepoId || 'watch',
     codexModelLabel: 'Magpie · Codex',
     codexAvailable: false,
     codexTaskId: '',
@@ -93,6 +99,7 @@ export default {
     editBuffer: '',
     summaryItems: [],
 
+    recentThreads: [],
     threads: [
     {
         "id": "ai",
@@ -144,18 +151,7 @@ export default {
       { role: 'assistant', text: '人工智能是让计算机模拟人类智能的技术，广泛应用于医疗、教育、创作与办公。' }
     ],
 
-    apiBaseUrl: LOCAL_SERVICE_URL,
-    apiKey: '',
-    apiModel: LOCAL_MODEL,
-    apiSaved: false,
-    apiStateText: '尚未测试',
-    apiMark: 'API',
-    hapticsEnabled: true,
-    fieldName: 'url',
-    fieldTitle: '服务地址',
-    fieldHint: 'HTTP / HTTPS 地址',
-    fieldStep: '1 / 3',
-    fieldValue: ''
+    hapticsEnabled: true
   },
 
 
@@ -165,8 +161,6 @@ export default {
   },
 
   onInit() {
-    var self = this;
-    this.clockTicker = null;
     this.voiceTicker = null;
     this.voicePhaseTimer = null;
     this.recordTicker = null;
@@ -190,19 +184,16 @@ export default {
     this.menuSwipeTimer = null;
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.hardwareKeyAt = 0;
+    this.hardwareKeySubscriber = null;
+    this.hardwareKeySubscribing = false;
     this.recordWaveBars = this.buildWaveBars();
-    this.updateClock();
-    this.clockTicker = setInterval(function () {
-      self.updateClock();
-    }, 15000);
+    this.subscribeHardwareKeyEvents();
   },
 
   onDestroy() {
+    this.unsubscribeHardwareKeyEvents();
     this.clearAllTimers();
-    if (this.clockTicker) {
-      clearInterval(this.clockTicker);
-      this.clockTicker = null;
-    }
   },
 
   clearAllTimers() {
@@ -240,9 +231,112 @@ export default {
   },
 
   onShow() {
+    this.focusHardwareKey();
     if (this.subPage === 'task' && this.codexTaskId) {
       this.startCodexPolling();
     }
+  },
+
+  subscribeHardwareKeyEvents() {
+    var self = this;
+    if (this.hardwareKeySubscriber || this.hardwareKeySubscribing) {
+      return;
+    }
+    this.hardwareKeySubscribing = true;
+    try {
+      commonEvent.createSubscriber({ events: [HARDWARE_KEY_EVENT] }, function (error, subscriber) {
+        self.hardwareKeySubscribing = false;
+        if (error) {
+          console.error('NOVA_KEY subscriber create failed: ' + JSON.stringify(error));
+          return;
+        }
+        self.hardwareKeySubscriber = subscriber;
+        commonEvent.subscribe(subscriber, function (subscribeError, data) {
+          if (subscribeError) {
+            console.error('NOVA_KEY subscribe failed: ' + JSON.stringify(subscribeError));
+            return;
+          }
+          self.handleHardwareKeyTrigger('common-event');
+        });
+      });
+    } catch (error) {
+      this.hardwareKeySubscribing = false;
+      console.error('NOVA_KEY common event unavailable: ' + JSON.stringify(error));
+    }
+  },
+
+  unsubscribeHardwareKeyEvents() {
+    var subscriber = this.hardwareKeySubscriber;
+    this.hardwareKeySubscriber = null;
+    if (!subscriber) {
+      return;
+    }
+    try {
+      commonEvent.unsubscribe(subscriber, function () {});
+    } catch (error) {
+      // Page teardown must continue even if the event service is already gone.
+    }
+  },
+
+  focusHardwareKey() {
+    var self = this;
+    setTimeout(function () {
+      try {
+        var root = self.$element('hardwareKeySink');
+        if (root && root.focus) {
+          root.focus();
+        }
+      } catch (error) {
+        // Hardware keys remain optional when the runtime has no focus API.
+      }
+    }, 80);
+  },
+
+  handleHardwareKey(event) {
+    var keyCode = event && (event.keyCode !== undefined ? event.keyCode : event.code);
+    console.info('NOVA_KEY keyCode=' + keyCode +
+      ' isPressed=' + (event && event.isPressed) +
+      ' keyAction=' + (event && event.keyAction));
+    if (Number(keyCode) !== 196) {
+      return false;
+    }
+    if (event && (event.isPressed === false || event.keyAction === 1)) {
+      return true;
+    }
+    this.handleHardwareKeyTrigger('hml');
+    return true;
+  },
+
+  handleHardwareKeyTrigger(source) {
+    var now = Date.now();
+    if (now - (this.hardwareKeyAt || 0) < 600) {
+      return true;
+    }
+    this.hardwareKeyAt = now;
+    console.info('NOVA_KEY trigger source=' + source);
+    this.startVoiceFromHardwareKey();
+    return true;
+  },
+
+  startVoiceFromHardwareKey() {
+    if (this.subPage === 'voice' && this.voiceState === 'listening') {
+      this.voicePressActive = false;
+      this.submitVoiceTurn();
+      return;
+    }
+    if (this.subPage === 'voice' && this.voiceState === 'thinking') {
+      this.showToast('正在处理，请稍候');
+      return;
+    }
+    if (this.subPage === 'voice' && (this.voiceActive || this.voiceCaptureStarting)) {
+      this.endVoice(false);
+      return;
+    }
+    this.startVoice();
+    this.startVoicePress(null);
+    this.voicePressActive = false;
+    this.voiceCta = '结束并发送';
+    this.voiceStatus = '正在聆听 · 再次按键结束';
   },
 
   buildWaveBars() {
@@ -258,12 +352,6 @@ export default {
       });
     }
     return bars;
-  },
-
-  updateClock() {
-    var now = new Date();
-    this.clockText = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-    this.dateText = (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + WEEKDAYS[now.getDay()];
   },
 
   showToast(message) {
@@ -293,8 +381,8 @@ export default {
     // intermediate offset. Only vertical gestures change the main menu.
     // Scroll the list first; only an outward drag at its edge changes menus.
     if (this.pageIndex >= 2) {
-      var shortList = this.pageIndex === 2 &&
-        this.taskHistory.length + this.threads.length + 1 <= 5;
+      var shortList = this.pageIndex === 3 ||
+        (this.pageIndex === 2 && this.taskHistory.length + this.threads.length + 1 <= 5);
       if (event.direction === 'up' && !this.mainListAtEnd && !shortList) {
         this.mainListAtStart = false;
         return;
@@ -350,6 +438,35 @@ export default {
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
     this.pageIndex = nextIndex;
+    this.resetListScroll(nextIndex);
+  },
+
+  resetListScroll(index) {
+    var self = this;
+    if (!this.$element) {
+      return;
+    }
+    var listId = index === 2 ? 'recentList' : (index === 3 ? 'settingsList' : '');
+    if (!listId) {
+      return;
+    }
+    var scrollToStart = function () {
+      if (!self.$element || self.pageIndex !== index) {
+        return;
+      }
+      try {
+        var list = self.$element(listId);
+        if (list && list.scrollTo) {
+          list.scrollTo({ index: 0 });
+        } else if (list && list.scrollTop) {
+          list.scrollTop({ smooth: false });
+        }
+      } catch (error) {
+        // The list can still be mounting; the gesture handler remains usable.
+      }
+    };
+    setTimeout(scrollToStart, 120);
+    setTimeout(scrollToStart, 420);
   },
 
   openSubPage(name) {
@@ -364,11 +481,6 @@ export default {
   closeSubPage() {
     if (this.subPage === 'voice') {
       this.endVoice();
-      return;
-    }
-    if (this.subPage === 'field') {
-      this.subPage = 'api';
-      this.mainVisible = false;
       return;
     }
     if (this.subPage === 'answer') {
@@ -386,8 +498,6 @@ export default {
       this.syncCurrentThread();
       this.chatVisible = false;
       this.pageIndex = 2;
-    } else if (this.subPage === 'api') {
-      this.pageIndex = 3;
     }
     this.subPage = '';
     this.mainVisible = true;
@@ -411,6 +521,7 @@ export default {
     this.recordRunning = false;
     this.recordPaused = false;
     this.recordHasProgress = false;
+    this.recordSubmitting = false;
     this.recordSeconds = 0;
     this.recordTimer = '00:00';
     this.recordStatus = '轻触开始录音';
@@ -894,35 +1005,30 @@ export default {
       });
       return;
     }
-    this.voiceStatus = '正在识别真实语音';
-    var base = this.getServiceUrl('');
-    this.networkRequest(base + '/api/voice', {
-      method: 'POST',
-      header: {
-        'Content-Type': 'application/octet-stream',
-        'X-Nova-Model': this.apiModel || LOCAL_MODEL
-      },
-      extraData: pcm,
-      connectTimeout: 60000,
-      readTimeout: 180000
-    }).then(function (result) {
+    this.voiceStatus = '正在识别语音';
+    this.transcribePcm(pcm).then(function (transcript) {
       if (!self.voiceActive) {
-        return;
-      }
-      var payload = self.parseHttpResult(result.result);
-      var transcript = (payload.transcript || '').trim();
-      var reply = (payload.reply || '').trim();
-      if (!reply) {
-        throw new Error('empty response');
+        return null;
       }
       self.voiceTranscriptText = transcript;
+      self.voiceStatus = '正在生成回答';
+      return self.requestModel([
+        { role: 'system', content: MODEL_SYSTEM_PROMPT },
+        { role: 'user', content: transcript }
+      ]).then(function (reply) {
+        return { transcript: transcript, reply: reply };
+      });
+    }).then(function (response) {
+      if (!response || !self.voiceActive) {
+        return;
+      }
+      var transcript = response.transcript;
+      var reply = response.reply;
       self.voiceResponseText = (transcript ? '识别：' + transcript + '\n' : '') + reply;
       self.voiceAnswerText = reply;
       self.voiceState = 'answered';
       self.voiceStatus = '回答完成 · 手表保持静音';
       self.serviceStatus = '已连接';
-      self.apiSaved = true;
-      self.apiStateText = '服务已连接';
       self.voiceActive = false;
       self.clearVoiceTimers();
       self.stopVoiceResources();
@@ -935,10 +1041,10 @@ export default {
       console.info('[NOVA_NET] voice failed: ' + message);
       self.serviceStatus = '连接失败';
       self.voiceState = 'error';
-      self.voiceStatus = '真实服务请求失败';
+      self.voiceStatus = '语音请求失败';
       self.voiceResponseText = self.describeNetworkError(error);
       self.voiceCta = '按住重试';
-      self.showToast('真实语音请求失败');
+      self.showToast('语音请求失败');
     });
   },
 
@@ -1030,11 +1136,76 @@ export default {
   },
 
   getServiceUrl(path) {
-    var base = (this.apiBaseUrl || LOCAL_SERVICE_URL).trim().replace(/\/+$/, '');
+    var base = LOCAL_SERVICE_URL;
     if (!path) {
       return base;
     }
     return base + (path.charAt(0) === '/' ? path : '/' + path);
+  },
+
+  getModelUrl(path) {
+    if (!path) {
+      return MODEL_BASE_URL;
+    }
+    return MODEL_BASE_URL + (path.charAt(0) === '/' ? path : '/' + path);
+  },
+
+  requestModel(messages) {
+    var self = this;
+    var base = MODEL_BASE_URL.trim().replace(/\/+$/, '');
+    if (!base || !MODEL_API_KEY) {
+      return Promise.reject(new Error('内置模型配置不可用'));
+    }
+    var url = base + '/chat/completions';
+    return this.networkRequest(url, {
+      method: http.RequestMethod.POST,
+      header: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + MODEL_API_KEY
+      },
+      extraData: {
+        model: MODEL_NAME,
+        messages: messages,
+        max_tokens: 128,
+        temperature: 0.2,
+        reasoning_effort: 'none',
+        stream: false
+      },
+      connectTimeout: 10000,
+      readTimeout: 30000
+    }).then(function (result) {
+      var payload = self.parseHttpResult(result.result);
+      var choice = payload.choices && payload.choices[0];
+      var message = choice && choice.message;
+      var content = message && message.content;
+      if (typeof content !== 'string' || !content.trim()) {
+        throw new Error('empty model reply');
+      }
+      return content.trim();
+    });
+  },
+
+  transcribePcm(pcm) {
+    var self = this;
+    return this.encodePcmBase64(pcm).then(function (encoded) {
+      return self.networkRequest(self.getServiceUrl('/api/asr'), {
+        method: http.RequestMethod.POST,
+        header: { 'Content-Type': 'application/json' },
+        extraData: {
+          pcmBase64: encoded,
+          sampleRate: VOICE_SAMPLE_RATE
+        },
+        connectTimeout: 10000,
+        readTimeout: 180000
+      });
+    }).then(function (result) {
+      var payload = self.parseHttpResult(result.result);
+      var transcript = String(payload.transcript || '').trim();
+      if (!transcript) {
+        throw new Error('empty transcript');
+      }
+      return transcript;
+    });
   },
 
   codexHeaders() {
@@ -1336,11 +1507,6 @@ export default {
     }
   },
 
-  toggleVoiceMode() {
-    this.voiceMode = this.voiceMode === 'codex' ? 'ollama' : 'codex';
-    this.showToast(this.voiceMode === 'codex' ? '语音后端：Codex 只读' : '语音后端：Ollama 即时');
-  },
-
   resumeVoiceFromAnswer() {
     this.subPage = '';
     this.mainVisible = true;
@@ -1454,6 +1620,9 @@ export default {
   },
 
   toggleRecording() {
+    if (this.recordSubmitting) {
+      return;
+    }
     if (this.recordRunning) {
       this.pauseRecording();
     } else if (this.recordSeconds > 0) {
@@ -1481,6 +1650,7 @@ export default {
     this.recordRunning = true;
     this.recordPaused = false;
     this.recordHasProgress = true;
+    this.recordSubmitting = false;
     this.recordSeconds = 0;
     this.recordTimer = '00:00';
     this.recordStatus = '正在请求麦克风';
@@ -1646,6 +1816,9 @@ export default {
 
   finishRecording() {
     var self = this;
+    if (this.recordSubmitting) {
+      return;
+    }
     if (this.recordRunning && this.recordStartedAt) {
       this.recordSeconds = Math.floor((Date.now() - this.recordStartedAt) / 1000);
     }
@@ -1664,17 +1837,52 @@ export default {
     var pcm = this.concatChunks(this.recordPcmChunks);
     this.recordPcmChunks = [];
     this.recordHasProgress = true;
-    this.recordStatus = '正在转写并创建任务';
+    this.recordSubmitting = true;
+    this.recordStatus = '正在识别录音';
     this.recordText = '';
     this.showToast('录音完成，正在提交');
-    this.submitCodexVoice(pcm, 'record').catch(function (error) {
+    var transcript = '';
+    this.transcribePcm(pcm).then(function (text) {
+      transcript = text;
+      self.recordText = text;
+      self.recordStatus = '正在生成摘要';
+      return self.requestModel([
+        { role: 'system', content: '你是会议记录助手。把用户提供的录音转写整理成 3 到 4 条简洁中文摘要，每行一条，不要添加标题。' },
+        { role: 'user', content: text }
+      ]);
+    }).then(function (summary) {
+      self.recordSubmitting = false;
+      self.codexTranscript = transcript;
+      self.codexFinalText = summary;
+      self.summaryItems = self.buildCodexSummary(summary);
+      self.resultTab = 'summary';
+      self.recordStatus = '摘要已生成';
+      self.subPage = 'result';
+      self.mainVisible = false;
+      self.showToast('摘要已生成');
+    }).catch(function () {
+      self.recordSubmitting = false;
+      if (transcript) {
+        self.codexTranscript = transcript;
+        self.codexFinalText = transcript;
+        self.summaryItems = self.summarize(transcript);
+        self.resultTab = 'summary';
+        self.recordStatus = '已转写 · 摘要使用本地整理';
+        self.subPage = 'result';
+        self.mainVisible = false;
+        self.showToast('摘要生成失败，已保留转写');
+        return;
+      }
       self.recordStatus = '提交失败 · 可重新录音';
       self.recordHasProgress = false;
-      self.showToast('Codex 后端不可用');
+      self.showToast('语音服务不可用');
     });
   },
 
   markRecording() {
+    if (this.recordSubmitting) {
+      return;
+    }
     if (!this.recordHasProgress) {
       this.showToast('请先开始录音');
       return;
@@ -1797,17 +2005,13 @@ export default {
     }
   },
 
-  showCodexModelInfo() {
-    this.showToast(this.codexModelLabel + ' · 由 PC 固定');
-  },
-
-  showSilentInfo() {
-    this.showToast('手表不会播放 TTS');
-  },
-
   openRoundInterface() {
     this.stopVoiceResources();
-    router.push({ url: 'pages/round/index' });
+    try {
+      router.push({ uri: 'pages/round/index' });
+    } catch (error) {
+      this.showToast('打开失败');
+    }
   },
 
   restartRecording() {
@@ -1817,41 +2021,6 @@ export default {
     this.pageIndex = 1;
   },
 
-  checkServiceHealth() {
-    var self = this;
-    var base = this.getServiceUrl('');
-    this.apiStateText = '正在测试服务';
-    return this.networkRequest(base + '/health', {
-      method: http.RequestMethod.GET,
-      connectTimeout: 8000,
-      readTimeout: 12000
-    }).then(function (result) {
-      var payload = self.parseHttpResult(result.result);
-      var ok = payload && payload.ok === true;
-      var codexAvailable = !!(payload && payload.codex && payload.codex.available);
-      self.codexAvailable = codexAvailable;
-      if (payload && payload.codex && payload.codex.model) {
-        var modelName = String(payload.codex.model);
-        self.codexModelLabel = modelName.indexOf('deepseek') >= 0 ?
-          'DeepSeek V4.1 Flash' : modelName;
-      }
-      self.apiSaved = ok && codexAvailable;
-      self.serviceStatus = !ok ? '服务异常' :
-        (codexAvailable ? '已连接 · Codex 就绪' : '服务已连接 · 后端离线');
-      self.apiStateText = !ok ? '服务返回异常' :
-        (codexAvailable ? 'Codex 后端可用' : 'Magpie 后端不可用');
-      return ok && codexAvailable;
-    }).catch(function (error) {
-      var message = error && (error.message || error.data) ? (error.message || error.data) : String(error);
-      console.info('[NOVA_NET] health failed: ' + message);
-      self.apiSaved = false;
-      self.codexAvailable = false;
-      self.serviceStatus = '连接失败';
-      self.apiStateText = '错误:' + message.substring(0, 28);
-      return false;
-    });
-  },
-
   sendChat() {
     var self = this;
     var text = (this.chatInput || '').trim();
@@ -1859,71 +2028,33 @@ export default {
       this.showToast('请输入消息');
       return;
     }
-    var updated = copyMessages(this.chatMessages);
-    updated.push({ role: 'user', text: text });
-    this.chatMessages = updated;
+    var context = [{ role: 'system', content: MODEL_SYSTEM_PROMPT }];
+    var start = this.chatMessages.length > 12 ? this.chatMessages.length - 12 : 0;
+    for (var i = start; i < this.chatMessages.length; i++) {
+      var item = this.chatMessages[i];
+      if (item.role === 'user' || item.role === 'assistant') {
+        context.push({ role: item.role, content: item.text });
+      }
+    }
+    context.push({ role: 'user', content: text });
+    var pending = '思考中…';
+    var withPending = copyMessages(this.chatMessages);
+    withPending.push({ role: 'user', text: text });
+    withPending.push({ role: 'assistant', text: pending });
+    this.chatMessages = withPending;
     this.refreshChatView();
     if (this.chatTitle === '新对话') {
       this.chatTitle = text.length > 12 ? text.substring(0, 12) + '...' : text;
     }
     this.syncCurrentThread();
     this.chatInput = '';
-    if (this.voiceMode === 'codex') {
-      this.codexChatThreadId = this.currentThreadId;
-      this.submitCodexText(text, text).catch(function (error) {
-        var message = self.describeNetworkError(error);
-        self.chatMessages.push({ role: 'assistant', text: 'Codex 任务创建失败：' + message });
-        self.refreshChatView();
-        self.syncCurrentThread();
-        self.showToast('Codex 任务创建失败');
-      });
-      return;
-    }
-    var pending = '正在请求真实模型…';
-    var withPending = copyMessages(this.chatMessages);
-    withPending.push({ role: 'assistant', text: pending });
-    this.chatMessages = withPending;
-    this.refreshChatView();
-    this.syncCurrentThread();
-    var base = this.getServiceUrl('');
-    var isOpenAi = /\/v1\/?$/.test(base);
-    var url = isOpenAi ? base + '/chat/completions' : base + '/api/chat';
-    var body = isOpenAi ? {
-      model: this.apiModel,
-      messages: [{ role: 'user', content: text }]
-    } : {
-      model: this.apiModel || LOCAL_MODEL,
-      prompt: text
-    };
-    var headers = { 'Content-Type': 'application/json' };
-    if (this.apiKey) {
-      headers.Authorization = 'Bearer ' + this.apiKey;
-    }
-    this.apiStateText = '模型生成中';
-    this.networkRequest(url, {
-      method: http.RequestMethod.POST,
-      header: headers,
-      extraData: body,
-      connectTimeout: 60000,
-      readTimeout: 180000
-    }).then(function (result) {
-      var payload = self.parseHttpResult(result.result);
-      var reply = (payload.reply || '').trim();
-      if (isOpenAi) {
-        var choice = payload.choices && payload.choices[0];
-        reply = choice && choice.message ? choice.message.content : reply;
-      }
-      if (!reply) {
-        throw new Error('empty model reply');
-      }
+    this.requestModel(context).then(function (reply) {
       self.replacePendingAssistant(pending, reply);
       self.serviceStatus = '已连接';
-      self.apiStateText = '服务已连接';
-      self.apiSaved = true;
     }).catch(function (error) {
-      self.replacePendingAssistant(pending, '请求失败，请检查服务地址或网络');
+      var message = self.describeNetworkError(error);
+      self.replacePendingAssistant(pending, '请求失败：' + message);
       self.serviceStatus = '连接失败';
-      self.apiStateText = '服务不可达';
       self.showToast('真实模型请求失败');
     });
   },
@@ -1987,14 +2118,16 @@ export default {
 
   newChat() {
     var id = 'thread-' + Date.now();
-    this.threads.push({
+    var thread = {
       id: id,
       title: '新对话',
       preview: '空对话',
       mark: '新',
       markClass: 'blue-mark',
       messages: []
-    });
+    };
+    this.threads.push(thread);
+    this.recentThreads.push(thread);
     this.currentThreadId = id;
     this.chatTitle = '新对话';
     this.chatMessages = [];
@@ -2040,124 +2173,8 @@ export default {
     return '我会先整理核心信息，再给出清晰、可执行的建议。';
   },
 
-  openApiSettings() {
-    this.openSubPage('api');
-  },
-
-  openField(name) {
-    var labels = { url: '服务地址', token: '访问令牌', repo: '只读仓库', model: 'Ollama 模型' };
-    var hints = {
-      url: '局域网 HTTP 地址',
-      token: 'X-Nova-Token，仅存当前内存',
-      repo: '服务端白名单中的仓库 ID',
-      model: '仅 Ollama 即时模式使用'
-    };
-    var steps = { url: '1 / 4', token: '2 / 4', repo: '3 / 4', model: '4 / 4' };
-    var values = {
-      url: this.apiBaseUrl,
-      token: this.codexToken,
-      repo: this.codexRepoId,
-      model: this.apiModel
-    };
-    this.fieldName = name;
-    this.fieldTitle = labels[name] || '服务设置';
-    this.fieldHint = hints[name] || '';
-    this.fieldStep = steps[name] || '1 / 4';
-    this.fieldValue = values[name] || '';
-    this.openSubPage('field');
-  },
-
-  onFieldInput(event) {
-    this.fieldValue = event.value;
-  },
-
-  saveField() {
-    var value = (this.fieldValue || '').trim();
-    if (this.fieldName === 'url' && value && !/^https?:\/\/\S+$/i.test(value)) {
-      this.showToast('请输入有效的 HTTP(S) 地址');
-      return;
-    }
-    if (this.fieldName === 'url') {
-      this.apiBaseUrl = value.replace(/\/+$/, '');
-    } else if (this.fieldName === 'token') {
-      this.codexToken = value;
-    } else if (this.fieldName === 'repo') {
-      if (!/^[A-Za-z0-9_-]+$/.test(value)) {
-        this.showToast('仓库 ID 格式不正确');
-        return;
-      }
-      this.codexRepoId = value;
-    } else if (this.fieldName === 'model') {
-      this.apiModel = value;
-    }
-    this.markApiDirty();
-    this.subPage = 'api';
-    this.mainVisible = false;
-    this.showToast('已保存到当前内存');
-  },
-
   toggleHaptics() {
     this.hapticsEnabled = !this.hapticsEnabled;
     this.showToast(this.hapticsEnabled ? '触感反馈已开启' : '触感反馈已关闭');
-  },
-
-  onApiUrlInput(event) {
-    this.apiBaseUrl = event.value;
-    this.markApiDirty();
-  },
-
-  onApiKeyInput(event) {
-    this.apiKey = event.value;
-    this.markApiDirty();
-  },
-
-  onApiModelInput(event) {
-    this.apiModel = event.value;
-    this.markApiDirty();
-  },
-
-  markApiDirty() {
-    this.apiSaved = false;
-    this.apiStateText = '尚未保存';
-  },
-
-  saveApiSettings() {
-    var self = this;
-    var url = (this.apiBaseUrl || '').trim();
-    var model = (this.apiModel || '').trim();
-    if (!/^https?:\/\/\S+$/i.test(url) || !model) {
-      this.apiSaved = false;
-      this.apiStateText = '格式错误';
-      this.showToast('请检查服务地址和模型名称');
-      return;
-    }
-    if (this.voiceMode === 'codex' && !(this.codexToken || '').trim()) {
-      this.apiSaved = false;
-      this.apiStateText = '缺少访问令牌';
-      this.showToast('Codex 模式必须填写访问令牌');
-      return;
-    }
-    this.apiBaseUrl = url.replace(/\/+$/, '');
-    this.apiModel = model;
-    this.apiStateText = '正在测试真实服务';
-    this.checkServiceHealth().then(function (ok) {
-      if (ok) {
-        self.showToast('服务与 Codex 后端连接成功');
-      } else {
-        self.showToast('服务或 Codex 后端不可用');
-      }
-    });
-  },
-
-  resetApiSettings() {
-    this.apiBaseUrl = LOCAL_SERVICE_URL;
-    this.apiKey = '';
-    this.codexToken = '';
-    this.apiModel = LOCAL_MODEL;
-    this.apiSaved = false;
-    this.apiStateText = '尚未测试';
-    this.serviceStatus = '未连接';
-    this.codexAvailable = false;
-    this.showToast('已恢复本地服务默认值');
   }
 };

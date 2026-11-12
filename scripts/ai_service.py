@@ -130,7 +130,78 @@ class Runtime:
         return {"requestId": request_id, "transcript": text, "elapsedMs": elapsed_ms,
                 "wavPath": str(wav_path.relative_to(ROOT))}
 
+    def chat_completion(self, payload: dict) -> dict:
+        messages = payload.get("messages")
+        if not isinstance(messages, list) or not messages:
+            raise ValueError("messages is required")
+        if not self.args.model_api_url or not self.args.model_api_key:
+            raise RuntimeError("OpenAI-compatible model backend is not configured")
+        started = time.perf_counter()
+        request_payload = {
+            "model": str(payload.get("model") or self.args.model_api_name),
+            "messages": messages,
+            "stream": False,
+        }
+        for key in ("max_tokens", "temperature", "top_p", "reasoning_effort"):
+            if payload.get(key) is not None:
+                request_payload[key] = payload[key]
+        url = self.args.model_api_url.rstrip("/") + "/chat/completions"
+        result = None
+        last_error = None
+        for attempt in range(3):
+            req = Request(
+                url,
+                data=json.dumps(request_payload, ensure_ascii=False).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "User-Agent": "ai-watch/1.2.2",
+                    "Authorization": f"Bearer {self.args.model_api_key}",
+                },
+                method="POST",
+            )
+            try:
+                with urlopen(req, timeout=self.args.model_api_timeout) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                break
+            except HTTPError as exc:
+                last_error = exc
+                if exc.code not in (500, 502, 503, 504) or attempt == 2:
+                    raise
+            except (URLError, TimeoutError, OSError) as exc:
+                last_error = exc
+                if attempt == 2:
+                    raise
+            delay = 0.4 * (attempt + 1)
+            self.log(event="model_retry", attempt=attempt + 1,
+                     delayMs=round(delay * 1000), error=str(last_error))
+            time.sleep(delay)
+        if result is None:
+            raise RuntimeError("model backend returned no response")
+        choice = (result.get("choices") or [{}])[0]
+        reply = ((choice.get("message") or {}).get("content") or "").strip()
+        elapsed_ms = round((time.perf_counter() - started) * 1000)
+        self.log(event="model_done", model=result.get("model", request_payload["model"]),
+                 messageCount=len(messages), replyChars=len(reply), elapsedMs=elapsed_ms)
+        return result
+
     def chat(self, prompt: str, model: str) -> dict:
+        if self.args.model_api_url and self.args.model_api_key:
+            started = time.perf_counter()
+            result = self.chat_completion({
+                "model": self.args.model_api_name or model,
+                "messages": [
+                    {"role": "system", "content": "你是圆形手表上的中文智能助手。回答必须简短、自然，优先控制在 60 个汉字以内。"},
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": 256,
+                "temperature": 0.2,
+            })
+            choice = (result.get("choices") or [{}])[0]
+            reply = ((choice.get("message") or {}).get("content") or "").strip()
+            elapsed_ms = round((time.perf_counter() - started) * 1000)
+            return {"model": result.get("model", model), "reply": reply,
+                    "elapsedMs": elapsed_ms, "done": True}
         started = time.perf_counter()
         body = {
             "model": model,
@@ -210,6 +281,14 @@ class Handler(BaseHTTPRequestHandler):
                 supplied = authorization[7:]
         return secrets.compare_digest(supplied, expected)
 
+    def _model_authorized(self) -> bool:
+        expected = self.runtime.args.model_client_token
+        if not expected:
+            return True
+        authorization = self.headers.get("Authorization", "")
+        supplied = authorization[7:] if authorization.lower().startswith("bearer ") else ""
+        return secrets.compare_digest(supplied, expected)
+
     def _read_body(self) -> bytes:
         length = int(self.headers.get("Content-Length", "0"))
         if length < 0 or length > self.runtime.args.max_body_bytes:
@@ -259,6 +338,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             body = self._read_body()
+            if self.path == "/v1/chat/completions":
+                if not self._model_authorized():
+                    self._send_json(HTTPStatus.UNAUTHORIZED, {
+                        "error": {"message": "model auth failed", "type": "authentication_error"}
+                    })
+                    return
+                payload = json.loads(body.decode("utf-8"))
+                result = self.runtime.chat_completion(payload)
+                self._send_json(HTTPStatus.OK, result)
+                return
             if self.path == "/api/chat":
                 payload = json.loads(body.decode("utf-8"))
                 prompt = str(payload.get("prompt") or "").strip()
@@ -268,9 +357,20 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(HTTPStatus.OK, {"ok": True, **result})
                 return
             if self.path == "/api/asr":
-                if not body:
+                if "application/json" in (self.headers.get("Content-Type") or ""):
+                    payload = json.loads(body.decode("utf-8"))
+                    encoded = str(payload.get("pcmBase64") or "")
+                    if not encoded:
+                        raise ValueError("pcmBase64 is required")
+                    try:
+                        pcm = base64.b64decode(encoded, validate=True)
+                    except (binascii.Error, ValueError) as exc:
+                        raise ValueError("pcmBase64 is invalid") from exc
+                else:
+                    pcm = body
+                if not pcm:
                     raise ValueError("PCM body is required")
-                result = self.runtime.transcribe(body)
+                result = self.runtime.transcribe(pcm)
                 self._send_json(HTTPStatus.OK, {"ok": True, **result})
                 return
             if self.path == "/api/tts":
@@ -400,6 +500,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--model", default="translategemma:4b")
+    parser.add_argument("--model-api-url", default=os.environ.get("MAGPIE_BASE_URL", ""))
+    parser.add_argument("--model-api-key", default=os.environ.get("MAGPIE_API_KEY", ""))
+    parser.add_argument("--model-api-name", default=os.environ.get("MAGPIE_MODEL", "group/ai-watch"))
+    parser.add_argument("--model-api-timeout", type=int, default=180)
+    parser.add_argument("--model-client-token", default=os.environ.get("NOVA_MODEL_CLIENT_TOKEN", ""))
     parser.add_argument("--whisper-model", default="small")
     parser.add_argument("--allow-client", action="append", default=[])
     parser.add_argument("--evidence-dir", default=str(DEFAULT_EVIDENCE))
