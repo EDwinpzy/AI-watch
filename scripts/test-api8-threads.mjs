@@ -13,7 +13,8 @@ const requiredImports = [
   '@ohos.pasteboard',
   '@ohos.multimedia.audio',
   '@ohos.ability.featureAbility',
-  '@ohos.net.http'
+  '@ohos.net.http',
+  '@ohos.util'
 ];
 for (const specifier of requiredImports) {
   assert.ok(
@@ -107,6 +108,17 @@ const sandbox = {
           return Promise.resolve({ authResults: [0] });
         }
       };
+    }
+  },
+  util: {
+    Base64: class {
+      encodeToStringSync(src) {
+        return Buffer.from(src).toString('base64');
+      }
+
+      encodeToString(src) {
+        return Promise.resolve(Buffer.from(src).toString('base64'));
+      }
     }
   },
   http: {
@@ -230,6 +242,7 @@ assert.equal(gesturePage.voiceCta, '按住说话');
 const pcm = new Int16Array([0, 16384, -16384]);
 assert.ok(page.computePcmLevel(pcm.buffer) > 20);
 assert.equal(page.encodePcmBase64(new Uint8Array([97, 98, 99]).buffer), 'YWJj');
+assert.equal(await page.encodePcmBase64Async(new Uint8Array([97, 98, 99]).buffer), 'YWJj');
 
 const fetchResult = await page.networkRequest('http://example.test/health', { method: 'GET' });
 assert.equal(fetchResult.responseCode, 200);

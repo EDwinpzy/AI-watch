@@ -2,6 +2,7 @@ import pasteboard from '@ohos.pasteboard';
 import audio from '@ohos.multimedia.audio';
 import featureAbility from '@ohos.ability.featureAbility';
 import http from '@ohos.net.http';
+import util from '@ohos.util';
 
 function pad2(value) {
   return value < 10 ? '0' + value : '' + value;
@@ -1013,18 +1014,20 @@ export default {
         reject(error);
         return;
       }
-      var body = {
-        pcmBase64: self.encodePcmBase64(pcm),
-        sampleRate: VOICE_SAMPLE_RATE,
-        repoId: self.codexRepoId,
-        mode: 'readonly'
-      };
-      self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
-        method: http.RequestMethod.POST,
-        header: self.codexHeaders(),
-        extraData: body,
-        connectTimeout: 10000,
-        readTimeout: 60000
+      self.encodePcmBase64Async(pcm).then(function (encodedPcm) {
+        var body = {
+          pcmBase64: encodedPcm,
+          sampleRate: VOICE_SAMPLE_RATE,
+          repoId: self.codexRepoId,
+          mode: 'readonly'
+        };
+        return self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
+          method: http.RequestMethod.POST,
+          header: self.codexHeaders(),
+          extraData: body,
+          connectTimeout: 10000,
+          readTimeout: 60000
+        });
       }).then(function (result) {
         var payload = self.parseHttpResult(result.result);
         if (!payload.taskId) {
@@ -1332,28 +1335,11 @@ export default {
   },
 
   encodePcmBase64(buffer) {
-    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    var bytes = new Uint8Array(buffer);
-    var parts = [];
-    var chunkSize = 3 * 4096;
-    for (var start = 0; start < bytes.length; start += chunkSize) {
-      var end = Math.min(start + chunkSize, bytes.length);
-      var chunk = bytes.subarray(start, end);
-      var output = '';
-      for (var i = 0; i < chunk.length; i += 3) {
-        var a = chunk[i];
-        var hasB = i + 1 < chunk.length;
-        var hasC = i + 2 < chunk.length;
-        var b = hasB ? chunk[i + 1] : 0;
-        var c = hasC ? chunk[i + 2] : 0;
-        output += chars.charAt(a >> 2);
-        output += chars.charAt(((a & 3) << 4) | (b >> 4));
-        output += hasB ? chars.charAt(((b & 15) << 2) | (c >> 6)) : '=';
-        output += hasC ? chars.charAt(c & 63) : '=';
-      }
-      parts.push(output);
-    }
-    return parts.join('');
+    return new util.Base64().encodeToStringSync(new Uint8Array(buffer));
+  },
+
+  encodePcmBase64Async(buffer) {
+    return new util.Base64().encodeToString(new Uint8Array(buffer));
   },
 
   networkRequest(url, options) {
