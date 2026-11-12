@@ -1,4 +1,4 @@
-<div class="app" @swipe="handleSwipe" @touchstart="onRootTouchStart">
+<div class="app" @swipe="handleSwipe" @touchstart="onRootTouchStart" @touchend="onRootTouchEnd" @touchcancel="onRootTouchCancel">
   <button id="hardwareKeySink" class="hardware-key-sink" focusable="true" onkey="handleHardwareKey"></button>
   <div if="{{mainVisible && pageIndex === 0}}" class="page home-page">
     <div class="home-sky"></div>

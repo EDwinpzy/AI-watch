@@ -243,7 +243,8 @@ export default {
     var self = this;
     this.clockTicker = null;
     this.toastTimer = null;
-    this.menuSwipeTimer = null;
+    this.menuPendingIndex = null;
+    this.rootTouchActive = false;
     this.voiceTicker = null;
     this.voiceMaxTimer = null;
     this.voicePlaybackTimer = null;
@@ -317,10 +318,8 @@ export default {
   },
 
   clearAllTimers() {
-    if (this.menuSwipeTimer) {
-      clearTimeout(this.menuSwipeTimer);
-      this.menuSwipeTimer = null;
-    }
+    this.menuPendingIndex = null;
+    this.rootTouchActive = false;
     if (this.toastTimer) {
       clearTimeout(this.toastTimer);
       this.toastTimer = null;
@@ -428,8 +427,19 @@ export default {
   },
 
   onRootTouchStart() {
+    this.rootTouchActive = true;
     this.mainListAtStartAtTouch = this.mainListAtStart;
     this.mainListAtEndAtTouch = this.mainListAtEnd;
+  },
+
+  onRootTouchEnd() {
+    this.rootTouchActive = false;
+    this.commitMenuPage();
+  },
+
+  onRootTouchCancel() {
+    this.rootTouchActive = false;
+    this.menuPendingIndex = null;
   },
 
   mainListReachedStart() {
@@ -447,16 +457,21 @@ export default {
   },
 
   queueMenuPage(index) {
-    if (this.menuSwipeTimer) {
+    this.menuPendingIndex = index;
+    if (!this.rootTouchActive) {
+      this.commitMenuPage();
+    }
+  },
+
+  commitMenuPage() {
+    var index = this.menuPendingIndex;
+    this.menuPendingIndex = null;
+    if (index === null || typeof index === 'undefined') {
       return;
     }
-    var self = this;
-    this.menuSwipeTimer = setTimeout(function () {
-      self.menuSwipeTimer = null;
-      if (!self.subPage && self.mainVisible) {
-        self.setPage(index);
-      }
-    }, 220);
+    if (!this.subPage && this.mainVisible) {
+      this.setPage(index);
+    }
   },
 
   setPage(index) {
