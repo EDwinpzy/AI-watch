@@ -12,7 +12,7 @@
     "setup:local": "powershell -ExecutionPolicy Bypass -File scripts/setup-local-build.ps1",
     "check:core": "node scripts/test-watch-core.mjs",
     "check:source": "node scripts/verify-source.mjs",
-    "check:api8": "node scripts/test-api8-threads.mjs"
+    "check:api8": "node scripts/test-api8-all.mjs"
   },
   "dependencies": {}
 }

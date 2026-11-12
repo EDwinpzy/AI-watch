@@ -33,8 +33,9 @@ api     服务配置
 field   字段编辑
 ```
 
-所有页面集中在 API 8 `index.hml` / `index.css` / `index.js`，
-没有 WebView。
+经典 Aurora 页面集中在 API 8 `pages/index/index.*`。Apple Watch 圆环界面
+独立位于 `pages/round/index.*`，通过 `@ohos.router` 从设置页双向切换。
+两套页面都没有 WebView，也不会在切换时删除另一套实现。
 
 ## 3. 状态
 
@@ -51,6 +52,7 @@ apiBaseUrl / codexToken / codexRepoId
 ```
 
 服务地址与令牌只保存在当前页面内存。页面重建后需重新输入。
+圆环页的内置服务配置来自本地构建注入文件，不进入 Git。
 
 ## 4. 生命周期
 
@@ -70,8 +72,8 @@ apiBaseUrl / codexToken / codexRepoId
 
 ## 6. 静音设计
 
-前端不存在媒体播放依赖。声音设置是固定只读状态，不是开关。回答通过
-文字显示，任务状态通过文字和触感反馈表达。
+经典 Aurora 页不存在媒体播放依赖，声音设置是固定只读状态。圆环页保留
+可选 TTS，但 `voiceOutputEnabled` 默认关闭；回答始终先以文字显示。
 
 ## 7. Web 原型
 

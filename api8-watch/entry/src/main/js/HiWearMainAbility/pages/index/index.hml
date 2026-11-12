@@ -110,6 +110,16 @@
   <div if="{{mainVisible && pageIndex === 3}}" class="page settings-page">
     <text class="fixed-page-title">设置</text>
     <list itemscale="false" itemcenter="false" shapemode="round" class="wrist-list" @scrolltop="mainListReachedStart" @scrollbottom="mainListReachedEnd">
+      <list-item class="list-item" @click="openRoundInterface">
+        <div class="glass-row row-inner">
+          <div class="row-icon-box"><image class="row-icon-img" src="/common/interface-icons/sparkle-cyan.png"></image></div>
+          <div class="row-copy">
+            <text class="row-label">界面风格</text>
+            <text class="row-subtitle">经典 Aurora · 可切换 Apple Watch 圆环</text>
+          </div>
+          <text class="row-badge">切换</text>
+        </div>
+      </list-item>
       <list-item class="list-item" @click="toggleVoiceMode">
         <div class="glass-row row-inner">
           <div class="row-icon-box"><image class="row-icon-img" src="/common/interface-icons/openai-white.png"></image></div>

@@ -1,7 +1,8 @@
 # NOVA Watch AI 文档
 
-当前设备版本为 `1.2.1`，正式入口是 `api8-watch/`。默认静音，
-语音任务通过 PC 本地服务转为只读 Codex 异步任务。
+当前设备版本为 `1.2.2`，正式入口是 `api8-watch/`。经典 Aurora 界面
+使用 PC 本地服务与只读 Codex 异步任务并固定静音；Apple Watch 圆环界面
+保留内置 Magpie、流式 STT 和默认关闭的 TTS。两套界面可从设置页切换。
 
 ## 当前规格
 
@@ -25,7 +26,7 @@
 ## 历史资料
 
 以下文档记录早期原型、Android 探针或旧版 TTS 验证，不代表当前
-`1.2.1` 静音版行为：
+`1.2.2` 双界面行为：
 
 - [Android 临时验机记录](ANDROID_VERIFICATION.md)
 - [旧版 ZIP 对齐记录](FRONTEND_ZIP_ALIGNMENT.md)
