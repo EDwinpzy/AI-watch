@@ -181,9 +181,12 @@ export default {
     this.voiceStartedAt = 0;
     this.recordStartedAt = 0;
     this.chatSwipeAt = 0;
-    this.menuSwipeTimer = null;
+    this.menuPendingIndex = null;
+    this.rootTouchActive = false;
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.hardwareKeyAt = 0;
     this.hardwareKeySubscriber = null;
     this.hardwareKeySubscribing = false;
@@ -197,10 +200,8 @@ export default {
   },
 
   clearAllTimers() {
-    if (this.menuSwipeTimer) {
-      clearTimeout(this.menuSwipeTimer);
-      this.menuSwipeTimer = null;
-    }
+    this.menuPendingIndex = null;
+    this.rootTouchActive = false;
     if (this.voiceTicker) {
       clearInterval(this.voiceTicker);
       this.voiceTicker = null;
@@ -382,12 +383,12 @@ export default {
     // Scroll the list first; only an outward drag at its edge changes menus.
     if (this.pageIndex >= 2) {
       var shortList = this.pageIndex === 3 ||
-        (this.pageIndex === 2 && this.taskHistory.length + this.threads.length + 1 <= 5);
-      if (event.direction === 'up' && !this.mainListAtEnd && !shortList) {
+        (this.pageIndex === 2 && this.taskHistory.length + this.threads.length + 1 <= 3);
+      if (event.direction === 'up' && !this.mainListAtEndAtTouch && !shortList) {
         this.mainListAtStart = false;
         return;
       }
-      if (event.direction === 'down' && !this.mainListAtStart) {
+      if (event.direction === 'down' && !this.mainListAtStartAtTouch && !shortList) {
         this.mainListAtEnd = false;
         return;
       }
@@ -399,24 +400,52 @@ export default {
     }
   },
 
+  onRootTouchStart() {
+    this.rootTouchActive = true;
+    this.mainListAtStartAtTouch = this.mainListAtStart;
+    this.mainListAtEndAtTouch = this.mainListAtEnd;
+  },
+
+  onRootTouchEnd() {
+    this.rootTouchActive = false;
+    this.commitMenuPage();
+  },
+
+  onRootTouchCancel() {
+    this.rootTouchActive = false;
+    this.menuPendingIndex = null;
+  },
+
   mainListReachedStart() {
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
   },
 
   mainListReachedEnd() {
     this.mainListAtEnd = true;
     this.mainListAtStart = false;
+    this.mainListAtEndAtTouch = true;
+    this.mainListAtStartAtTouch = false;
   },
 
   queueMenuPage(index) {
-    if (this.menuSwipeTimer) return;
-    var self = this;
-    // Wait for the current finger drag to finish before mounting a fresh list.
-    this.menuSwipeTimer = setTimeout(function () {
-      self.menuSwipeTimer = null;
-      if (!self.subPage && self.mainVisible) self.setPage(index);
-    }, 220);
+    this.menuPendingIndex = index;
+    if (!this.rootTouchActive) {
+      this.commitMenuPage();
+    }
+  },
+
+  commitMenuPage() {
+    var index = this.menuPendingIndex;
+    this.menuPendingIndex = null;
+    if (index === null || typeof index === 'undefined') {
+      return;
+    }
+    if (!this.subPage && this.mainVisible) {
+      this.setPage(index);
+    }
   },
 
   handleChatSwipe(event) {
@@ -437,6 +466,8 @@ export default {
     }
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.pageIndex = nextIndex;
     this.resetListScroll(nextIndex);
   },
@@ -465,8 +496,7 @@ export default {
         // The list can still be mounting; the gesture handler remains usable.
       }
     };
-    setTimeout(scrollToStart, 120);
-    setTimeout(scrollToStart, 420);
+    setTimeout(scrollToStart, 80);
   },
 
   openSubPage(name) {

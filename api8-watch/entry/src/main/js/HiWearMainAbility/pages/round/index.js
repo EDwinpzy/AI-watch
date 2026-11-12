@@ -243,7 +243,8 @@ export default {
     var self = this;
     this.clockTicker = null;
     this.toastTimer = null;
-    this.menuSwipeTimer = null;
+    this.menuPendingIndex = null;
+    this.rootTouchActive = false;
     this.voiceTicker = null;
     this.voiceMaxTimer = null;
     this.voicePlaybackTimer = null;
@@ -285,6 +286,8 @@ export default {
     this.destroyed = false;
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.recordWaveBars = this.buildRecordWaveBars();
     this.updateClock();
     this.clockTicker = setInterval(function () {
@@ -315,10 +318,8 @@ export default {
   },
 
   clearAllTimers() {
-    if (this.menuSwipeTimer) {
-      clearTimeout(this.menuSwipeTimer);
-      this.menuSwipeTimer = null;
-    }
+    this.menuPendingIndex = null;
+    this.rootTouchActive = false;
     if (this.toastTimer) {
       clearTimeout(this.toastTimer);
       this.toastTimer = null;
@@ -408,12 +409,12 @@ export default {
     if (this.pageIndex >= 2) {
       var shortHistory = this.pageIndex === 3 ||
         (this.pageIndex === 2 &&
-          this.taskHistory.length + this.threads.length + 1 <= 5);
-      if (event.direction === 'up' && !this.mainListAtEnd && !shortHistory) {
+          this.taskHistory.length + this.threads.length + 1 <= 3);
+      if (event.direction === 'up' && !this.mainListAtEndAtTouch && !shortHistory) {
         this.mainListAtStart = false;
         return;
       }
-      if (event.direction === 'down' && !this.mainListAtStart) {
+      if (event.direction === 'down' && !this.mainListAtStartAtTouch && !shortHistory) {
         this.mainListAtEnd = false;
         return;
       }
@@ -425,27 +426,52 @@ export default {
     }
   },
 
+  onRootTouchStart() {
+    this.rootTouchActive = true;
+    this.mainListAtStartAtTouch = this.mainListAtStart;
+    this.mainListAtEndAtTouch = this.mainListAtEnd;
+  },
+
+  onRootTouchEnd() {
+    this.rootTouchActive = false;
+    this.commitMenuPage();
+  },
+
+  onRootTouchCancel() {
+    this.rootTouchActive = false;
+    this.menuPendingIndex = null;
+  },
+
   mainListReachedStart() {
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
   },
 
   mainListReachedEnd() {
     this.mainListAtEnd = true;
     this.mainListAtStart = false;
+    this.mainListAtEndAtTouch = true;
+    this.mainListAtStartAtTouch = false;
   },
 
   queueMenuPage(index) {
-    if (this.menuSwipeTimer) {
+    this.menuPendingIndex = index;
+    if (!this.rootTouchActive) {
+      this.commitMenuPage();
+    }
+  },
+
+  commitMenuPage() {
+    var index = this.menuPendingIndex;
+    this.menuPendingIndex = null;
+    if (index === null || typeof index === 'undefined') {
       return;
     }
-    var self = this;
-    this.menuSwipeTimer = setTimeout(function () {
-      self.menuSwipeTimer = null;
-      if (!self.subPage && self.mainVisible) {
-        self.setPage(index);
-      }
-    }, 220);
+    if (!this.subPage && this.mainVisible) {
+      this.setPage(index);
+    }
   },
 
   setPage(index) {
@@ -455,6 +481,8 @@ export default {
     }
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.mainListAtStartAtTouch = true;
+    this.mainListAtEndAtTouch = false;
     this.pageIndex = nextIndex;
   },
 
@@ -493,9 +521,9 @@ export default {
       this.closeSubPage();
       return true;
     }
-    this.stopVoiceResources();
-    this.resetRecordingState();
-    return false;
+    // Only the physical crown/Home button may leave the app.
+    // Keep active recording state intact when a back gesture is blocked.
+    return true;
   },
 
   onPageChange(event) {

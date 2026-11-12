@@ -1,4 +1,4 @@
-<div class="app" @swipe="handleSwipe">
+<div class="app" @swipe="handleSwipe" @touchstart="onRootTouchStart" @touchend="onRootTouchEnd" @touchcancel="onRootTouchCancel">
   <button id="hardwareKeySink" class="hardware-key-sink" focusable="true" onkey="handleHardwareKey"></button>
   <div if="{{mainVisible && pageIndex === 0}}" class="page home-page">
     <div class="home-sky"></div>
@@ -19,6 +19,12 @@
         <image class="hero-icon" src="/common/interface-icons/waveform-white.png"></image>
         <text class="hero-label">录音摘要</text>
       </div>
+    </div>
+    <div class="page-dots">
+      <div class="page-dot dot-active"></div>
+      <div class="page-dot"></div>
+      <div class="page-dot"></div>
+      <div class="page-dot"></div>
     </div>
   </div>
 
@@ -59,10 +65,16 @@
         <text class="round-label">结束</text>
       </div>
     </div>
+    <div class="page-dots">
+      <div class="page-dot"></div>
+      <div class="page-dot dot-active"></div>
+      <div class="page-dot"></div>
+      <div class="page-dot"></div>
+    </div>
   </div>
 
   <div if="{{mainVisible && pageIndex === 2}}" class="page history-page">
-    <text class="fixed-page-title">最近对话</text>
+    <text class="fixed-page-title">最近</text>
     <list id="recentList" itemscale="false" itemcenter="false" shapemode="round" class="wrist-list" @scrolltop="mainListReachedStart" @scrollbottom="mainListReachedEnd">
       <list-item class="list-item" @click="newChat">
         <div class="glass-row row-inner new-chat-row">
@@ -96,6 +108,12 @@
       </list-item>
       <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
     </list>
+    <div class="page-dots">
+      <div class="page-dot"></div>
+      <div class="page-dot"></div>
+      <div class="page-dot dot-active"></div>
+      <div class="page-dot"></div>
+    </div>
   </div>
 
   <div if="{{mainVisible && pageIndex === 3}}" class="page settings-page">
@@ -126,6 +144,12 @@
       </list-item>
       <list-item class="round-scroll-spacer"><div class="round-spacer-body"></div></list-item>
     </list>
+    <div class="page-dots">
+      <div class="page-dot"></div>
+      <div class="page-dot"></div>
+      <div class="page-dot"></div>
+      <div class="page-dot dot-active"></div>
+    </div>
   </div>
 
   <div if="{{subPage === 'voice'}}" class="subpage voice-page">
