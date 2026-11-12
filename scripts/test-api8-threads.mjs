@@ -9,6 +9,32 @@ const pageSource = fs.readFileSync(sourcePath, 'utf8');
 const hml = fs.readFileSync(hmlPath, 'utf8');
 const css = fs.readFileSync(cssPath, 'utf8');
 
+function declarationsFor(selector) {
+  const declarations = {};
+  const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
+  let match;
+  while ((match = rulePattern.exec(css)) !== null) {
+    const selectors = match[1].split(',').map((item) => item.trim());
+    if (!selectors.includes(selector)) {
+      continue;
+    }
+    for (const declaration of match[2].split(';')) {
+      const separator = declaration.indexOf(':');
+      if (separator === -1) {
+        continue;
+      }
+      declarations[declaration.slice(0, separator).trim()] =
+        declaration.slice(separator + 1).trim();
+    }
+  }
+  return declarations;
+}
+
+function pixelProperty(selector, property) {
+  const value = declarationsFor(selector)[property];
+  return Number.parseFloat(value || '');
+}
+
 const requiredImports = [
   '@ohos.pasteboard',
   '@ohos.multimedia.audio',
@@ -47,7 +73,48 @@ assert.ok(
 assert.ok(!hml.includes('<audio'), 'the watch page must not contain an audio element');
 assert.ok(!css.includes('radial-gradient'), 'API 8 CSS must not use radial gradients');
 assert.ok(!css.includes('box-shadow'), 'API 8 CSS must not use unsupported shadows');
+assert.ok(!hml.includes('voice-glow.png'), 'voice lighting must not rely on transparent PNG blending');
+assert.ok(hml.includes('voice-ring-halo'), 'voice page must keep a CSS-only circular halo');
 assert.ok(css.includes('record-ring-recording'), 'recording state must use a standalone compatible class');
+for (const [selector, minimum] of [
+  ['.row-label', 20],
+  ['.row-subtitle', 14],
+  ['.pill-label', 18],
+  ['.hub-title', 18],
+  ['.hub-subtitle', 13.5],
+  ['.voice-live-text', 14],
+  ['.record-copy', 16],
+  ['.record-state', 14],
+  ['.answer-user-text', 16],
+  ['.answer-assistant-text', 16.5],
+  ['.task-card-text', 14.5],
+  ['.result-chip-text', 13],
+  ['.result-point-text', 16],
+  ['.transcript-text', 15.5],
+  ['.message-text', 16],
+  ['.chat-input', 16],
+  ['.field-hint', 14],
+  ['.toast-text', 14]
+]) {
+  assert.ok(
+    pixelProperty(selector, 'font-size') >= minimum,
+    `${selector} must stay legible on the 466 px display`
+  );
+}
+for (const [selector, minimum] of [
+  ['.record-start', 56],
+  ['.answer-actions', 56],
+  ['.result-actions', 56],
+  ['.api-save', 54],
+  ['.field-save', 56],
+  ['.chat-send', 54],
+  ['.task-stop', 52]
+]) {
+  assert.ok(
+    pixelProperty(selector, 'height') >= minimum,
+    `${selector} must retain a wrist-friendly touch target`
+  );
+}
 const apiSaveRule = css.match(/\.api-save\s*\{([\s\S]*?)\}/)?.[1] || '';
 const apiSaveTop = Number(apiSaveRule.match(/top:\s*(\d+)px/)?.[1] || NaN);
 const apiSaveHeight = Number(apiSaveRule.match(/height:\s*(\d+)px/)?.[1] || NaN);

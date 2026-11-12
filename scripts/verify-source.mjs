@@ -164,7 +164,7 @@ assert.ok(
 );
 assert.ok(
   api8Hml.includes('@click="openRoundInterface"') &&
-  api8Hml.includes('Apple Watch 圆环'),
+  api8Hml.includes('经典与圆环双主题'),
   'classic settings must expose the interface switch'
 );
 assert.ok(

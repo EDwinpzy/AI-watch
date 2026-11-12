@@ -17,10 +17,12 @@
     </div>
     <div class="home-actions">
       <div class="hero-action hero-chat" @click="startVoice">
+        <div class="hero-glint"></div>
         <image class="hero-icon" src="/common/interface-icons/chat-white.png"></image>
         <text class="hero-label">开始对话</text>
       </div>
       <div class="hero-action hero-record" @click="startRecordingFromHome">
+        <div class="hero-glint"></div>
         <image class="hero-icon" src="/common/interface-icons/waveform-white.png"></image>
         <text class="hero-label">录音摘要</text>
       </div>
@@ -30,8 +32,8 @@
   <div if="{{mainVisible && pageIndex === 1}}" class="page record-page">
     <text class="page-title">录音摘要</text>
     <div class="record-stage">
-      <div class="record-wavebox">
-        <div class="wave-bar" for="{{recordWaveBars}}" style="height: {{$item.height}}px; animation-delay: {{$item.delay}}s;"></div>
+      <div class="record-wavebox {{recordPaused ? 'record-wave-paused' : ''}}">
+        <div class="wave-bar" for="{{recordWaveBars}}" style="height: {{$item.height}}px; animation-duration: {{$item.duration}}s; animation-delay: {{$item.delay}}s;"></div>
       </div>
       <div class="record-ring {{recordRunning ? 'record-ring-recording' : (recordPaused ? 'record-ring-paused' : '')}}" @click="toggleRecording">
         <image class="record-wave-icon" src="/common/interface-icons/waveform-white.png"></image>
@@ -67,7 +69,6 @@
         <text class="round-label">结束</text>
       </div>
     </div>
-    <text class="record-note">最多 60 秒 · 结束自动转写 · 手表静音</text>
   </div>
 
   <div if="{{mainVisible && pageIndex === 2}}" class="page history-page">
@@ -115,7 +116,7 @@
           <div class="row-icon-box"><image class="row-icon-img" src="/common/interface-icons/sparkle-cyan.png"></image></div>
           <div class="row-copy">
             <text class="row-label">界面风格</text>
-            <text class="row-subtitle">经典 Aurora · 可切换 Apple Watch 圆环</text>
+            <text class="row-subtitle">经典与圆环双主题</text>
           </div>
           <text class="row-badge">切换</text>
         </div>
@@ -168,7 +169,7 @@
             <text class="row-subtitle">{{hapticsEnabled ? '开启' : '关闭'}}</text>
           </div>
           <div class="switch-track" style="background-color: {{hapticsEnabled ? '#167f8d' : '#26343a'}};">
-            <div class="switch-knob" style="margin-left: {{hapticsEnabled ? 24 : 0}}px;"></div>
+            <div class="switch-knob" style="margin-left: {{hapticsEnabled ? 28 : 0}}px;"></div>
           </div>
         </div>
       </list-item>
@@ -186,9 +187,11 @@
       @touchmove="onVoiceTouchMove"
       @touchend="onVoiceTouchEnd"
       @touchcancel="onVoiceTouchCancel">
+      <div class="voice-ring-halo"></div>
       <div class="voice-ring-outer"></div>
       <div class="voice-ring-mid"></div>
       <div class="voice-core">
+        <div class="voice-core-glint"></div>
         <image class="voice-mic" src="/common/control-icons/mic.png"></image>
         <text class="voice-cta">{{voiceCta}}</text>
       </div>
@@ -202,7 +205,7 @@
         <div class="hub-icon-box"><image class="hub-icon" src="/common/interface-icons/file-blue.png"></image></div>
         <div class="hub-copy">
           <text class="hub-title">录音摘要</text>
-          <text class="hub-subtitle">会议记录 · Codex 任务</text>
+          <text class="hub-subtitle">会议录音 · 自动摘要</text>
         </div>
         <text class="row-chevron">›</text>
       </div>
@@ -217,10 +220,6 @@
     </div>
     <div if="{{voiceResponseText}}" class="voice-error-card">
       <text class="voice-error-text">{{voiceResponseText}}</text>
-    </div>
-    <div class="voice-footer">
-      <text class="voice-footer-mark">⌃</text>
-      <text class="voice-footer-text">左滑收起 · 手表全程静音</text>
     </div>
   </div>
 
@@ -260,6 +259,7 @@
   <div if="{{subPage === 'task'}}" class="subpage task-page">
     <text class="page-title">Codex 任务</text>
     <div class="task-orbit">
+      <div class="orbit-halo"></div>
       <div class="orbit-dash"></div>
       <div class="task-core">
         <image class="task-icon" src="/common/interface-icons/terminal-cyan.png"></image>
@@ -278,7 +278,6 @@
       <image class="button-icon" src="/common/interface-icons/stop-red.png"></image>
       <text class="pill-label">停止任务</text>
     </div>
-    <text class="task-note">{{codexStatus === 'succeeded' || codexStatus === 'failed' || codexStatus === 'cancelled' ? '左滑离开，任务记录已保存' : '左滑离开，任务仍在 PC 继续'}}</text>
   </div>
 
   <div if="{{subPage === 'result'}}" class="subpage result-page">

@@ -77,7 +77,7 @@ python -m unittest -v scripts.test_codex_bridge
 node --check prototypes/aurora-watch/app.js
 ```
 
-`check:api8` 同时覆盖经典页和圆环页；当前为经典页 111 项、圆环页
+`check:api8` 同时覆盖经典页和圆环页；当前为经典页 115 项、圆环页
 121 项断言。
 
 长轮询回归：

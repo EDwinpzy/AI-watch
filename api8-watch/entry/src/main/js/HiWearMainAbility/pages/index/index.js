@@ -250,7 +250,12 @@ export default {
     for (var i = 0; i < 58; i++) {
       var distance = Math.abs(i - 28.5) / 28.5;
       var height = 8 + Math.round((1 - distance) * 42 + Math.abs(Math.sin(i * 1.71)) * 14);
-      bars.push({ height: height, delay: ((i * 7) % 10) / 10 });
+      var duration = 0.78 + ((i * 37) % 43) / 100;
+      bars.push({
+        height: height,
+        delay: ((i * 7) % 10) / 10,
+        duration: duration.toFixed(2)
+      });
     }
     return bars;
   },
