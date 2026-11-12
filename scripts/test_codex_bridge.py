@@ -587,7 +587,12 @@ class ServiceRuntimeTests(unittest.TestCase):
         reply = "敏感模型回答"
         logs = []
         runtime = object.__new__(self.ai_service.Runtime)
-        runtime.args = SimpleNamespace(ollama_timeout=1)
+        runtime.args = SimpleNamespace(
+            ollama_timeout=1,
+            model_api_url=None,
+            model_api_key=None,
+            model_api_name="group/ai-watch",
+        )
         runtime.log = lambda **payload: logs.append(payload)
 
         class FakeResponse:

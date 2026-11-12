@@ -8,6 +8,7 @@ oh_modules/
 node_modules/
 local.properties
 .secrets/
+api8-watch/entry/src/main/js/HiWearMainAbility/built-in-config.js
 api8-watch/entry/src/main/js/HiWearMainAbility/pages/round/built-in-config.js
 local-config.properties
 signing/

@@ -13,9 +13,10 @@ for (const specifier of [
   '@ohos.net.http',
   '@ohos.multimedia.media',
   '@ohos.net.webSocket',
-  '@ohos.router',
+  '@system.router',
   '@system.fetch',
-  '@ohos.util'
+  '@ohos.util',
+  '@ohos.pasteboard'
 ]) {
   assert.ok(
     pageSource.includes(`from '${specifier}'`),
@@ -24,7 +25,7 @@ for (const specifier of [
 }
 
 const source = pageSource
-  .replace(/^import .* from '(?:@(?:ohos|system)\.[^']+|\.\/built-in-config)';\r?$/gm, '')
+  .replace(/^import .* from '(?:@(?:ohos|system)\.[^']+|\.\.\/\.\.\/built-in-config)';\r?$/gm, '')
   .replace('export default {', 'module.exports = {');
 
 let permissionGranted = true;
@@ -62,6 +63,9 @@ const httpState = {
   destroys: 0,
   capturedUrl: '',
   capturedOptions: null,
+  codexCalls: [],
+  codexPolls: [],
+  codexFailStatus: 0,
   response: {
     responseCode: 200,
     result: JSON.stringify({
@@ -69,6 +73,10 @@ const httpState = {
       ok: true
     })
   }
+};
+const pasteboardState = {
+  values: [],
+  failNext: false
 };
 const routerState = {
   backCalls: 0
@@ -138,7 +146,66 @@ const sandbox = {
         request(url, options, callback) {
           httpState.capturedUrl = url;
           httpState.capturedOptions = options;
-          setTimeout(() => callback(null, httpState.response), 0);
+          let response = httpState.response;
+          if (url.includes('/api/codex/')) {
+            httpState.codexCalls.push({ url, options });
+            if (httpState.codexFailStatus) {
+              const status = httpState.codexFailStatus;
+              httpState.codexFailStatus = 0;
+              setTimeout(() => callback(null, {
+                responseCode: status,
+                result: JSON.stringify({ ok: false, error: 'test failure' })
+              }), 0);
+              return;
+            }
+            if (url.endsWith('/api/codex/voice')) {
+              response = {
+                responseCode: 200,
+                result: JSON.stringify({
+                  taskId: 'task-voice',
+                  status: 'queued',
+                  stage: '已排队',
+                  message: '等待 Codex 执行',
+                  transcript: '请介绍一下当前仓库。',
+                  elapsedMs: 0
+                })
+              };
+            } else if (url.endsWith('/api/codex/task') && options.method === 'POST') {
+              response = {
+                responseCode: 200,
+                result: JSON.stringify({
+                  taskId: 'task-text',
+                  status: 'queued',
+                  stage: '已排队',
+                  message: '等待 Codex 执行',
+                  transcript: '检查项目结构',
+                  elapsedMs: 0
+                })
+              };
+            } else if (url.endsWith('/cancel')) {
+              response = {
+                responseCode: 200,
+                result: JSON.stringify({ ok: true, status: 'cancelled' })
+              };
+            } else {
+              const poll = httpState.codexPolls.shift() || {
+                status: 'succeeded',
+                stage: '完成',
+                message: '任务完成',
+                finalText: '项目结构清晰，语音页和任务页均已接入。',
+                speechText: '项目结构清晰。',
+                elapsedMs: 2150
+              };
+              response = {
+                responseCode: 200,
+                result: JSON.stringify(Object.assign({
+                  taskId: 'task-voice',
+                  transcript: '请介绍一下当前仓库。'
+                }, poll))
+              };
+            }
+          }
+          setTimeout(() => callback(null, response), 0);
         },
         destroy() {
           httpState.destroys++;
@@ -271,6 +338,24 @@ const sandbox = {
   util: {
     TextDecoder
   },
+  pasteboard: {
+    createPlainTextData(value) {
+      return { value };
+    },
+    getSystemPasteboard() {
+      return {
+        setPasteData(data, callback) {
+          if (pasteboardState.failNext) {
+            pasteboardState.failNext = false;
+            callback(new Error('pasteboard denied'));
+            return;
+          }
+          pasteboardState.values.push(data.value);
+          callback(null);
+        }
+      };
+    }
+  },
   router: {
     back() {
       routerState.backCalls++;
@@ -279,7 +364,10 @@ const sandbox = {
   builtInConfig: {
     baseUrl: 'https://magpie-relay.pengzhiyuan0724.workers.dev/v1',
     apiKey: 'sk-test-local-placeholder',
-    model: 'group/ai-watch'
+    model: 'group/ai-watch',
+    codexBaseUrl: 'http://127.0.0.1:8787',
+    codexToken: 'test-codex-token',
+    codexRepoId: 'watch'
   },
   module: { exports: {} },
   exports: {},
@@ -303,6 +391,8 @@ page.onInit();
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+assert.equal(permissionRequests, 0);
+assert.equal(page.voiceOutputEnabled, false);
 assert.equal(page.threads.length, 2);
 assert.equal(page.builtInModel, 'group/ai-watch');
 assert.equal(
@@ -314,7 +404,14 @@ assert.equal(typeof page.openApiSettings, 'undefined');
 assert.equal(typeof page.openField, 'undefined');
 assert.equal(typeof page.submitVoiceTurn, 'undefined');
 assert.equal(typeof page.runVoiceSelfTest, 'undefined');
-assert.equal(typeof page.startRecording, 'undefined');
+assert.equal(typeof page.startRecording, 'function');
+assert.equal(typeof page.submitCodexText, 'function');
+assert.equal(typeof page.pollCodexTask, 'function');
+assert.equal(typeof page.openCodexTask, 'function');
+assert.equal(typeof page.copyResult, 'function');
+assert.equal(page.voiceMode, 'builtin');
+assert.equal(page.getCodexServiceUrl('/api/codex/task'), 'http://127.0.0.1:8787/api/codex/task');
+page.voiceMode = 'builtin';
 assert.ok(!pageSource.includes('/api/voice'));
 assert.ok(!pageSource.includes('/api/tts'));
 assert.ok(!pageSource.includes('apiBaseUrl'));
@@ -516,6 +613,185 @@ page.openThreadById('ai');
 assert.equal(page.chatMessages.at(-1).text, 'persist-api8');
 assert.match(page.threads[0].preview, /persist-api8/);
 
+page.voiceOutputEnabled = false;
+page.voiceMode = 'codex';
+page.voiceModeLabel = 'Codex 只读';
+page.newChat();
+const codexThreadId = page.currentThreadId;
+const codexCallsBefore = httpState.codexCalls.length;
+const textTaskResult = await page.sendChatText('检查项目结构', false);
+await wait(20);
+assert.equal(textTaskResult, true);
+assert.equal(page.subPage, 'task');
+assert.equal(page.mainVisible, false);
+assert.equal(page.codexTaskId, 'task-text');
+assert.equal(page.taskHistory[0].id, 'task-text');
+assert.equal(page.taskHistory[0].statusLabel, '已排队');
+assert.equal(page.chatMessages.at(-1).text, '检查项目结构');
+const textCreate = httpState.codexCalls[codexCallsBefore];
+assert.match(textCreate.url, /\/api\/codex\/task$/);
+assert.equal(textCreate.options.header['X-Nova-Token'], 'test-codex-token');
+assert.equal(JSON.parse(textCreate.options.extraData).mode, 'readonly');
+assert.equal(JSON.parse(textCreate.options.extraData).repoId, 'watch');
+page.stopCodexPolling();
+httpState.codexPolls = [{
+  taskId: 'task-text',
+  status: 'succeeded',
+  stage: '正在整理',
+  message: '任务完成',
+  transcript: '检查项目结构',
+  finalText: '项目结构清晰。\n语音页、录音摘要和 Codex 任务均已接入。',
+  speechText: '项目结构清晰。',
+  elapsedMs: 3200
+}];
+page.pollCodexTask();
+await wait(30);
+assert.equal(page.subPage, 'result');
+assert.equal(page.codexStatus, 'succeeded');
+assert.equal(page.summaryItems.length, 2);
+assert.equal(page.resultTranscriptText, '检查项目结构');
+assert.equal(page.taskHistory[0].status, 'succeeded');
+assert.equal(page.findThread(codexThreadId).messages.at(-1).text, page.codexFinalText);
+
+page.showTranscript();
+page.beginTranscriptEdit();
+assert.equal(page.editingTranscript, true);
+page.onTranscriptInput({ value: '编辑后的转写文本' });
+page.saveTranscript();
+assert.equal(page.editingTranscript, false);
+assert.equal(page.codexTranscript, '编辑后的转写文本');
+page.copyResult();
+await wait(5);
+assert.equal(pasteboardState.values.at(-1), '编辑后的转写文本');
+page.continueFromResult();
+assert.equal(page.subPage, 'chat');
+assert.equal(page.chatMessages[0].text, '编辑后的转写文本');
+assert.equal(page.chatMessages[1].text, page.codexFinalText);
+
+page.pageIndex = 0;
+page.mainVisible = false;
+page.subPage = 'task';
+page.openCodexTask({
+  id: 'task-history',
+  status: 'failed',
+  stage: '执行失败',
+  error: 'Magpie 后端不可用',
+  transcript: '读取失败测试',
+  elapsedText: '00:08'
+});
+assert.equal(page.subPage, 'task');
+assert.equal(page.codexError, 'Magpie 后端不可用');
+assert.ok(page.codexPollTimer, 'terminal history without a synced result must still allow one poll');
+httpState.codexPolls = [{
+  taskId: 'task-history',
+  status: 'cancelled',
+  stage: '已停止',
+  message: '任务已取消',
+  transcript: '读取失败测试',
+  elapsedMs: 9000
+}];
+page.stopCodexPolling();
+page.pollCodexTask();
+await wait(30);
+assert.equal(page.codexStatus, 'cancelled');
+assert.equal(page.codexStatusLabel(page.codexStatus), '已停止');
+
+page.voiceMode = 'codex';
+httpState.codexFailStatus = 409;
+page.newChat();
+const conflictResult = await page.sendChatText('并发任务测试', false);
+await wait(20);
+assert.equal(conflictResult, false);
+assert.equal(page.chatMessages.at(-1).text, 'Codex 任务创建失败：已有 Codex 任务正在执行');
+assert.equal(page.toastText, '已有 Codex 任务正在执行');
+assert.equal(page.describeCodexError(new Error('HTTP 401')), 'Codex 访问令牌无效');
+
+page.voiceMode = 'codex';
+page.resetRecordingState();
+page.startRecording();
+await wait(12);
+assert.equal(page.recordRunning, true);
+assert.equal(permissionRequestCode, 102);
+page.recordPcmChunks = [new Uint8Array(32000)];
+page.markRecording();
+assert.equal(page.recordMarks.length, 1);
+page.pauseRecording();
+assert.equal(page.recordPaused, true);
+assert.equal(page.recordRunning, false);
+page.resumeRecording();
+await wait(12);
+assert.equal(page.recordRunning, true);
+const voiceCallsBefore = httpState.codexCalls.length;
+page.recordPcmChunks = [new Uint8Array(32000)];
+page.finishRecording();
+await wait(220);
+assert.equal(page.subPage, 'task');
+assert.equal(page.codexOrigin, 'record');
+assert.equal(page.taskHistory[0].id, 'task-voice');
+const recordCreate = httpState.codexCalls[voiceCallsBefore];
+assert.match(recordCreate.url, /\/api\/codex\/voice$/);
+assert.equal(JSON.parse(recordCreate.options.extraData).sampleRate, 16000);
+assert.ok(JSON.parse(recordCreate.options.extraData).pcmBase64.length > 100);
+assert.equal(page.recordPcmChunks.length, 0);
+assert.match(pageSource, /RECORD_MAX_SECONDS = 60/);
+
+page.stopCodexPolling();
+page.newChat();
+const voiceThreadId = page.currentThreadId;
+page.codexUserCommitted = false;
+page.codexAssistantCommitted = true;
+await page.submitCodexVoice(new Uint8Array(32000), 'voice');
+await wait(20);
+assert.equal(page.codexOrigin, 'voice');
+assert.equal(page.codexAssistantCommitted, false);
+assert.equal(page.codexUserCommitted, true);
+assert.equal(page.findThread(voiceThreadId).messages.at(-1).text, '请介绍一下当前仓库。');
+
+page.stopCodexPolling();
+page.newChat();
+const lateTranscriptThreadId = page.currentThreadId;
+page.codexTaskId = 'task-late-transcript';
+page.codexOrigin = 'voice';
+page.codexChatThreadId = lateTranscriptThreadId;
+page.codexUserCommitted = false;
+page.codexAssistantCommitted = false;
+page.applyCodexSnapshot({
+  status: 'running',
+  stage: '正在识别',
+  message: '语音识别完成',
+  transcript: '稍后返回的语音转写',
+  elapsedMs: 1200
+});
+assert.equal(page.codexUserCommitted, true);
+assert.equal(page.findThread(lateTranscriptThreadId).messages.at(-1).text, '稍后返回的语音转写');
+
+page.voiceMode = 'builtin';
+page.voiceModeLabel = 'Magpie 即时';
+page.networkRequest = function () {
+  return Promise.resolve({
+    result: JSON.stringify({
+      choices: [{ message: { content: '这是直接语音回答。' } }]
+    })
+  });
+};
+page.newChat();
+const answerResult = await page.sendChatText('直接语音问题', true);
+assert.equal(answerResult, true);
+assert.equal(page.subPage, 'answer');
+assert.equal(page.voiceQuestionText, '直接语音问题');
+assert.equal(page.voiceAnswerText, '这是直接语音回答。');
+page.copyVoiceAnswer();
+await wait(5);
+assert.equal(pasteboardState.values.at(-1), '这是直接语音回答。');
+page.continueVoiceChat();
+assert.equal(page.subPage, 'chat');
+
+page.toggleHaptics();
+assert.equal(page.hapticsEnabled, false);
+page.toggleHaptics();
+assert.equal(page.hapticsEnabled, true);
+assert.equal(typeof page.toggleVoiceMode, 'undefined');
+
 const navigationState = {
   subPage: page.subPage,
   mainVisible: page.mainVisible,
@@ -526,6 +802,12 @@ page.mainVisible = true;
 page.pageIndex = 1;
 assert.equal(page.onBackPress(), false);
 assert.equal(page.pageIndex, 1);
+page.subPage = 'chat';
+page.handleSwipe({ direction: 'right' });
+assert.equal(page.subPage, 'chat');
+page.handleSwipe({ direction: 'left' });
+assert.equal(page.subPage, '');
+assert.equal(page.pageIndex, 2);
 page.pageIndex = 3;
 page.mainListReachedEnd();
 page.handleSwipe({ direction: 'up' });
@@ -560,16 +842,43 @@ assert.match(hml, /@click="startVoiceChat"/);
 assert.match(hml, /class="voice-button/);
 assert.match(hml, /class="voice-state"/);
 assert.match(hml, /class="composer-input"/);
-assert.match(hml, /class="built-in-card"/);
-assert.match(hml, /toggleVoiceOutput/);
+assert.ok(!hml.includes('toggleVoiceOutput'), 'voice playback toggle must be removed');
+assert.match(hml, /class="page record-page"/);
+assert.match(hml, /startRecordingFromHome/);
+assert.match(hml, /class="record-actions"/);
+assert.match(hml, /for="\{\{recordWaveBars\}\}"/);
+assert.match(hml, /markRecording/);
+assert.match(hml, /finishRecording/);
+assert.match(hml, /for="\{\{taskHistory\}\}"/);
+assert.match(hml, /openCodexTask\(\$item\)/);
+assert.match(hml, /class="task-status-chip/);
+assert.match(hml, /cancelCodexTask/);
+assert.match(hml, /subPage === 'answer'/);
+assert.match(hml, /copyVoiceAnswer/);
+assert.match(hml, /subPage === 'task'/);
+assert.match(hml, /subPage === 'result'/);
+assert.match(hml, /beginTranscriptEdit/);
+assert.match(hml, /saveTranscript/);
+assert.match(hml, /copyResult/);
+assert.match(hml, /continueFromResult/);
+assert.ok(!hml.includes('toggleVoiceMode'), 'voice backend switch must be removed');
+assert.match(hml, /toggleHaptics/);
+assert.match(hml, /始终静音/);
 assert.ok(!hml.includes('openField('), 'service field editor must be removed');
 assert.ok(!hml.includes('API 密钥'), 'API key editor must not render');
 assert.ok(!hml.includes('runVoiceSelfTest'), 'unavailable relay voice self-test must be removed');
 assert.ok(!hml.includes('演示录音'), 'fake recording copy must be removed');
 assert.ok(!hml.includes('不采集声音'), 'text-only recording copy must be removed');
 assert.ok(!hml.includes('value="‹"'), 'prototype navigation must not render a back button');
+assert.ok(!/@click="(goBack|closeSubPage|closeChat|cancelTranscriptEdit)"/.test(hml),
+  'visible navigation controls are forbidden');
 assert.match(css, /\.mic-glyph/);
 assert.match(css, /\.voice-button-live/);
+assert.match(css, /\.record-wave-bar/);
+assert.match(css, /\.task-orbit/);
+assert.match(css, /\.answer-assistant-card/);
+assert.match(css, /\.transcript-input/);
+assert.match(css, /\.switch-track/);
 assert.ok(!/border-radius\s*:\s*[^;]*%/.test(css), 'API 8 CSS must not use percentage border-radius');
 assert.ok(!/background\s*:\s*[^;]*#[0-9a-fA-F]{3,8}/.test(css), 'API 8 solid colors must use background-color');
 assert.ok(!/:active\s+[.#]/.test(css), 'API 8 CSS must not use descendant :active selectors');

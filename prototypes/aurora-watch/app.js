@@ -5,6 +5,7 @@
   const CAPTURE = params.get("capture") === "1";
   const FREEZE = params.get("freeze") === "1";
   if (CAPTURE) document.body.classList.add("capture-mode");
+  let pendingMotion = null;
 
   const ICONS = {
     signal: "cell-signal-high",
@@ -213,12 +214,13 @@
     }, 1800);
   }
 
-  function waveBars(count = 70) {
+  function waveBars(count = 58) {
     return Array.from({ length: count }, (_, index) => {
       const center = Math.abs(index - (count - 1) / 2) / ((count - 1) / 2);
       const height = 8 + Math.round((1 - center) * 46 + Math.abs(Math.sin(index * 1.71)) * 17);
-      const delay = `${(index % 9) * 0.06}s`;
-      return `<i style="height:${height}px;animation-delay:${delay}"></i>`;
+      const duration = 0.78 + ((index * 37) % 43) / 100;
+      const delay = -0.03 - ((index * 53) % 97) / 10;
+      return `<i style="height:${height}px;--wave-duration:${duration.toFixed(2)}s;--wave-delay:${delay.toFixed(2)}s"></i>`;
     }).join("");
   }
 
@@ -254,6 +256,7 @@
           <span class="soft-chip">${openAiIcon()} ${escapeHtml(state.voiceBackend)} · 只读</span>
         </div>
         <button class="voice-hero" data-action="finish-voice" aria-label="完成本次语音输入">
+          <span class="voice-orbit" aria-hidden="true"></span>
           <span class="voice-core">${icon("mic")}<span>按住说话</span></span>
         </button>
         <div class="voice-live-label"><i></i>正在聆听</div>
@@ -280,8 +283,8 @@
         ${statusBar()}
         <div class="screen-title">语音回答</div>
         <div class="scroll-area no-head">
-          <div class="answer-bubble user"><small>你</small><p>检查一下当前 Codex 任务的完成情况。</p></div>
-          <div class="answer-bubble"><small>ChatGPT</small><p>任务已完成。前端页面已经收敛，后台会在任务注册表中保留结果；现在可以复制回答，或继续追问具体模块。</p></div>
+          <div class="answer-bubble user" style="--i:0"><small>你</small><p>检查一下当前 Codex 任务的完成情况。</p></div>
+          <div class="answer-bubble" style="--i:1"><small>ChatGPT</small><p>任务已完成。前端页面已经收敛，后台会在任务注册表中保留结果；现在可以复制回答，或继续追问具体模块。</p></div>
         </div>
         <div class="answer-footer">
           <button class="secondary-pill" data-action="copy-voice">${icon("copy")}复制回答</button>
@@ -293,7 +296,7 @@
 
   function recordScreen() {
     return `
-      <div class="app-screen record-screen">
+      <div class="app-screen record-screen ${state.record.paused ? "is-paused" : ""}">
         ${statusBar()}
         <div class="screen-title">录音摘要</div>
         <div class="record-visual">
@@ -310,7 +313,6 @@
           <button class="round-action" data-action="mark-recording"><i>${icon("bookmark")}</i>标记</button>
           <button class="round-action is-danger" data-action="finish-codex"><i>${icon("stop")}</i>结束</button>
         </div>
-        <div class="record-hint">结束后自动转写并发送给 Codex · 左滑离开页面</div>
         ${roundToast()}
       </div>`;
   }
@@ -320,7 +322,7 @@
       <div class="app-screen running-screen">
         ${statusBar()}
         <div class="screen-title">Codex 任务</div>
-        <div class="running-orbit"><span class="running-core">${icon("terminal")}</span></div>
+        <div class="running-orbit"><span class="running-halo" aria-hidden="true"></span><span class="running-core">${icon("terminal")}</span></div>
         <div class="running-status">
           <strong>${escapeHtml(state.task.stage)}</strong>
           <span>${escapeHtml(state.task.message)} · ${timerText(state.task.elapsed)}</span>
@@ -334,7 +336,7 @@
   function resultScreen() {
     const points = TASK_POINTS.map(
       (point, index) => `
-        <section class="result-point">
+        <section class="result-point" style="--i:${index}">
           <span class="result-number">0${index + 1}</span>
           <strong>${escapeHtml(point.title)}</strong>
           <p>${escapeHtml(point.text)}</p>
@@ -368,8 +370,8 @@
   function historyScreen() {
     const rows = state.history
       .map(
-        (item) => `
-          <button class="row-card" data-open-history="${escapeHtml(item.id)}">
+        (item, index) => `
+          <button class="row-card" style="--i:${index}" data-open-history="${escapeHtml(item.id)}">
             <span class="row-icon">${icon(item.icon)}</span>
             <span class="row-copy"><span class="row-title">${escapeHtml(item.title)}</span><span class="row-sub">${escapeHtml(item.sub)}</span></span>
             <span class="status-tag ${item.kind === "result" ? "is-live" : ""}">${escapeHtml(item.tag)}</span>
@@ -389,8 +391,8 @@
   function chatScreen() {
     const messages = state.chatMessages
       .map(
-        (message) => `
-          <div class="message ${message.role === "user" ? "user" : ""}">
+        (message, index) => `
+          <div class="message ${message.role === "user" ? "user" : ""}" style="--i:${index}">
             <small>${message.role === "user" ? "你" : "ChatGPT"}</small>
             <p>${escapeHtml(message.text)}</p>
           </div>`
@@ -453,8 +455,8 @@
       ["model", "cube", "Ollama 模型", state.provider.model],
     ]
       .map(
-        ([field, iconName, label, value]) => `
-          <button class="row-card config-row" data-field="${field}">
+        ([field, iconName, label, value], index) => `
+          <button class="row-card config-row" data-field="${field}" style="--i:${index}">
             <span class="row-icon">${icon(iconName)}</span>
             <span class="row-copy"><span class="row-sub">${escapeHtml(label)}</span><span class="row-title">${escapeHtml(value)}</span></span>
             ${icon("arrowRight", "row-chevron")}
@@ -564,15 +566,23 @@
     const screen = $("#screen");
     const renderer = RENDERERS[state.screen] || homeScreen;
     screen.innerHTML = renderer();
-    screen.firstElementChild?.classList.add("is-enter");
+    const app = screen.firstElementChild;
+    if (app && pendingMotion) {
+      app.classList.add("is-enter");
+      if (pendingMotion !== "forward") {
+        app.classList.add(`is-enter-${pendingMotion}`);
+      }
+    }
+    pendingMotion = null;
     renderNav();
     renderContext();
     bindInputs();
   }
 
-  function navigate(screen, { replace = false } = {}) {
+  function navigate(screen, { replace = false, motion = "forward" } = {}) {
     if (!RENDERERS[screen]) screen = "home";
     state.screen = screen;
+    pendingMotion = motion;
     const method = replace ? "replaceState" : "pushState";
     window.history[method](null, "", `#${screen}`);
     render();
@@ -584,7 +594,7 @@
       showToast("已在首页");
       return;
     }
-    navigate(parent);
+    navigate(parent, { motion: "back" });
   }
 
   function mainScreenStep(direction) {
@@ -592,7 +602,7 @@
     const index = order.indexOf(state.screen);
     if (index < 0) return false;
     const next = (index + (direction > 0 ? 1 : order.length - 1)) % order.length;
-    navigate(order[next]);
+    navigate(order[next], { motion: direction > 0 ? "up" : "down" });
     return true;
   }
 
@@ -604,12 +614,19 @@
     const screen = $("#screen");
     let start = null;
     let current = null;
+    let captured = false;
 
     screen.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || isEditable(event.target)) return;
-      start = { x: event.clientX, y: event.clientY, target: event.target, scroll: event.target.closest?.(".scroll-area") };
+      start = {
+        x: event.clientX,
+        y: event.clientY,
+        pointerId: event.pointerId,
+        target: event.target,
+        scroll: event.target.closest?.(".scroll-area"),
+      };
       current = null;
-      screen.setPointerCapture?.(event.pointerId);
+      captured = false;
     });
 
     screen.addEventListener("pointermove", (event) => {
@@ -617,6 +634,10 @@
       const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
       current = { dx, dy };
+      if (!captured && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        screen.setPointerCapture?.(event.pointerId);
+        captured = true;
+      }
       if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
         screen.firstElementChild?.style.setProperty("--drag-x", `${Math.max(dx * 0.24, -18)}px`);
         screen.firstElementChild?.classList.add("is-drag");
@@ -635,8 +656,12 @@
       } else if (Math.abs(dy) > 62 && Math.abs(dy) > Math.abs(dx)) {
         mainScreenStep(dy < 0 ? 1 : -1);
       }
+      if (captured && start.pointerId != null) {
+        screen.releasePointerCapture?.(start.pointerId);
+      }
       start = null;
       current = null;
+      captured = false;
     };
     screen.addEventListener("pointerup", finish);
     screen.addEventListener("pointercancel", finish);
@@ -666,6 +691,10 @@
   function toggleRecordingPause() {
     state.record.paused = !state.record.paused;
     state.record.running = !state.record.paused;
+    const recordScreen = $(".record-screen");
+    if (recordScreen) recordScreen.classList.toggle("is-paused", state.record.paused);
+    const recordState = $(".record-state");
+    if (recordState) recordState.textContent = state.record.paused ? "录音已暂停" : "正在录音";
     showToast(state.record.paused ? "录音已暂停" : "继续录音");
   }
 
@@ -914,11 +943,26 @@
 
   function tick() {
     if (FREEZE) return;
-    const beforeTask = state.task.elapsed;
     if (state.record.running && !state.record.paused) state.record.seconds += 1;
+
+    const previousStage = state.task.stage;
     tickTask();
-    if (state.screen === "record" || state.screen === "running") {
-      if (state.task.elapsed !== beforeTask || state.record.running) render();
+
+    if (state.screen === "record") {
+      const time = $(".record-time");
+      if (time) time.textContent = timerText(state.record.seconds);
+    }
+
+    if (state.screen === "running") {
+      const stage = $(".running-status strong");
+      const detail = $(".running-status span");
+      if (stage && stage.textContent !== state.task.stage) {
+        stage.textContent = state.task.stage;
+        stage.classList.remove("is-changing");
+        void stage.offsetWidth;
+        stage.classList.add("is-changing");
+      }
+      if (detail) detail.textContent = `${state.task.message} · ${timerText(state.task.elapsed)}`;
     }
   }
 
@@ -952,10 +996,12 @@
   bindActions();
   bindGestures();
   bindKeyboard();
+  pendingMotion = "forward";
   initFromHash();
   window.addEventListener("popstate", () => {
     const screen = window.location.hash.slice(1);
     state.screen = RENDERERS[screen] ? screen : "home";
+    pendingMotion = "back";
     render();
   });
   window.setInterval(tick, 1000);

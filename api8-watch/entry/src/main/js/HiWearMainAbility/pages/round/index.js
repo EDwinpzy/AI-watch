@@ -1,12 +1,13 @@
 import audio from '@ohos.multimedia.audio';
 import featureAbility from '@ohos.ability.featureAbility';
 import http from '@ohos.net.http';
+import pasteboard from '@ohos.pasteboard';
 import webSocket from '@ohos.net.webSocket';
 import media from '@ohos.multimedia.media';
-import router from '@ohos.router';
+import router from '@system.router';
 import systemFetch from '@system.fetch';
 import util from '@ohos.util';
-import builtInConfig from './built-in-config';
+import builtInConfig from '../../built-in-config';
 
 function installLegacyTextGlobals() {
   var scope = null;
@@ -123,7 +124,7 @@ function splitSpeechText(text, maxLength) {
 
 var BUILT_IN_BASE_URL = builtInConfig.baseUrl || 'https://magpie-relay.pengzhiyuan0724.workers.dev/v1';
 var BUILT_IN_API_KEY = builtInConfig.apiKey || '';
-var BUILT_IN_MODEL = builtInConfig.model || 'group/ai-watch';
+var BUILT_IN_MODEL = builtInConfig.model || 'workbuddy/deepseek-v4.1-flash';
 var BUILT_IN_SYSTEM_PROMPT = '你是 NOVA 手表 AI 助手。回答简洁清楚，优先给出可以直接执行的建议。';
 var STT_WS_URL = 'wss://api.stt.ai/v1/stream';
 var STT_MODEL = 'whisper-large-v3-turbo';
@@ -134,10 +135,17 @@ var VOICE_SAMPLE_RATE = 16000;
 var VOICE_CHUNK_BYTES = 6400;
 var VOICE_MAX_SECONDS = 15;
 var VOICE_MIN_BYTES = 12800;
+var RECORD_MAX_SECONDS = 60;
+var BASE64_CHUNK_BYTES = 6144;
+var CODEX_POLL_MS = 1500;
+var BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 var TTS_CHUNK_CHARS = 96;
 var STT_CONNECT_TIMEOUT_MS = 15000;
 var STT_FINAL_TIMEOUT_MS = 12000;
 var STT_QUIET_FINALIZE_MS = 1600;
+var CODE_BASE_URL = String(builtInConfig.codexBaseUrl || '').replace(/\/+$/, '');
+var CODE_TOKEN = builtInConfig.codexToken || '';
+var CODE_REPO_ID = builtInConfig.codexRepoId || 'watch';
 
 export default {
   data: {
@@ -189,6 +197,43 @@ export default {
     voiceTranscriptText: '',
     voiceOutputEnabled: false,
     composerPlaceholder: '输入消息',
+    voiceMode: 'builtin',
+    voiceModeLabel: 'Magpie 即时',
+    hapticsEnabled: true,
+    voiceQuestionText: '',
+    voiceAnswerText: '',
+
+    recordRunning: false,
+    recordPaused: false,
+    recordHasProgress: false,
+    recordStatus: '轻触开始录音',
+    recordTimer: '00:00',
+    recordSeconds: 0,
+    recordInputLevel: 0,
+    recordMarks: [],
+    recordWaveBars: [],
+    recordControlLabel: '开始录音',
+    recordText: '',
+    recordPcmChunks: [],
+
+    codexTaskId: '',
+    codexStatus: 'idle',
+    codexStage: '空闲',
+    codexMessage: '等待任务',
+    codexElapsedText: '00:00',
+    codexTranscript: '',
+    codexFinalText: '',
+    codexSpeechText: '',
+    codexError: '',
+    codexOrigin: '',
+    taskHistory: [],
+    codexRepoId: CODE_REPO_ID,
+    codexModelLabel: 'Magpie · Codex',
+    resultTab: 'summary',
+    summaryItems: [],
+    resultTranscriptText: '',
+    editingTranscript: false,
+    editBuffer: '',
 
     serviceStatus: BUILT_IN_API_KEY ? '内置' : '缺少本地密钥',
     builtInModel: BUILT_IN_MODEL
@@ -228,9 +273,19 @@ export default {
     this.voiceSpeechChunks = [];
     this.voiceSpeechIndex = 0;
     this.voiceCaptureActive = false;
+    this.recordTicker = null;
+    this.recordMaxTimer = null;
+    this.recordAudioCapturer = null;
+    this.recordCaptureActive = false;
+    this.recordStartedAt = 0;
+    this.codexPollTimer = null;
+    this.codexUserCommitted = false;
+    this.codexAssistantCommitted = false;
+    this.codexChatThreadId = '';
     this.destroyed = false;
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
+    this.recordWaveBars = this.buildRecordWaveBars();
     this.updateClock();
     this.clockTicker = setInterval(function () {
       self.updateClock();
@@ -240,10 +295,22 @@ export default {
   onDestroy() {
     this.destroyed = true;
     this.stopVoiceResources();
+    this.stopRecordCaptureOnly();
     this.clearAllTimers();
     if (this.clockTicker) {
       clearInterval(this.clockTicker);
       this.clockTicker = null;
+    }
+  },
+
+  onHide() {
+    this.stopCodexPolling();
+  },
+
+  onShow() {
+    if ((this.subPage === 'task' || this.subPage === 'result') && this.codexTaskId &&
+      !this.isCodexTerminal(this.codexStatus)) {
+      this.startCodexPolling();
     }
   },
 
@@ -280,6 +347,32 @@ export default {
       clearTimeout(this.voiceQuietTimer);
       this.voiceQuietTimer = null;
     }
+    if (this.recordTicker) {
+      clearInterval(this.recordTicker);
+      this.recordTicker = null;
+    }
+    if (this.recordMaxTimer) {
+      clearTimeout(this.recordMaxTimer);
+      this.recordMaxTimer = null;
+    }
+    if (this.codexPollTimer) {
+      clearTimeout(this.codexPollTimer);
+      this.codexPollTimer = null;
+    }
+  },
+
+  buildRecordWaveBars() {
+    var bars = [];
+    for (var i = 0; i < 27; i++) {
+      var distance = Math.abs(i - 13) / 13;
+      var height = 5 + Math.round((1 - distance) * 23 + Math.abs(Math.sin(i * 1.37)) * 8);
+      bars.push({
+        height: height,
+        duration: (0.72 + ((i * 31) % 37) / 100).toFixed(2),
+        delay: (((i * 7) % 10) / 10).toFixed(1)
+      });
+    }
+    return bars;
   },
 
   updateClock() {
@@ -307,13 +400,16 @@ export default {
       return;
     }
     if (this.subPage) {
-      if (event.direction === 'right') {
+      if (event.direction === 'left') {
         this.closeSubPage();
       }
       return;
     }
     if (this.pageIndex >= 2) {
-      if (event.direction === 'up' && !this.mainListAtEnd) {
+      var shortHistory = this.pageIndex === 3 ||
+        (this.pageIndex === 2 &&
+          this.taskHistory.length + this.threads.length + 1 <= 5);
+      if (event.direction === 'up' && !this.mainListAtEnd && !shortHistory) {
         this.mainListAtStart = false;
         return;
       }
@@ -353,9 +449,13 @@ export default {
   },
 
   setPage(index) {
+    var nextIndex = (index + 4) % 4;
+    if (this.pageIndex === 1 && nextIndex !== 1) {
+      this.resetRecordingState();
+    }
     this.mainListAtStart = true;
     this.mainListAtEnd = false;
-    this.pageIndex = (index + 4) % 4;
+    this.pageIndex = nextIndex;
   },
 
   openSubPage(name) {
@@ -364,6 +464,20 @@ export default {
   },
 
   closeSubPage() {
+    if (this.subPage === 'answer') {
+      this.subPage = 'chat';
+      this.mainVisible = false;
+      this.setVoicePhase('idle', '');
+      return;
+    }
+    if (this.subPage === 'task' || this.subPage === 'result') {
+      this.stopCodexPolling();
+      this.editingTranscript = false;
+      this.subPage = '';
+      this.mainVisible = true;
+      this.pageIndex = 2;
+      return;
+    }
     if (this.subPage === 'chat') {
       this.syncCurrentThread();
       this.stopVoiceResources();
@@ -380,11 +494,16 @@ export default {
       return true;
     }
     this.stopVoiceResources();
+    this.resetRecordingState();
     return false;
   },
 
   onPageChange(event) {
+    var leavingRecording = this.pageIndex === 1 && event.index !== 1;
     this.pageIndex = event.index;
+    if (leavingRecording) {
+      this.resetRecordingState();
+    }
   },
 
   openQuickChat() {
@@ -394,6 +513,14 @@ export default {
   startVoiceChat() {
     this.newChat();
     this.startVoiceInput();
+  },
+
+  startRecordingFromHome() {
+    if (this.subPage) {
+      this.closeSubPage();
+    }
+    this.setPage(1);
+    this.startRecording();
   },
 
   setVoicePhase(phase, status) {
@@ -444,6 +571,7 @@ export default {
     }
     this.stopVoicePlayback();
     this.stopMicCapture();
+    this.stopRecordCaptureOnly();
     this.voiceTurnId = (this.voiceTurnId || 0) + 1;
     var turnId = this.voiceTurnId;
     this.voicePcmChunks = [];
@@ -463,6 +591,11 @@ export default {
         if (!granted) {
           self.setVoicePhase('idle', '');
           self.showToast('未获得麦克风权限');
+          return;
+        }
+        if (self.voiceMode === 'codex') {
+          self.setVoicePhase('requesting', '正在启动只读 Codex…');
+          self.createAndStartCapturer(turnId);
           return;
         }
         self.setVoicePhase('requesting', '正在连接语音服务…');
@@ -570,7 +703,9 @@ export default {
       self.voiceCapturedBytes += buffer.byteLength;
       self.voiceInputLevel = self.computePcmLevel(buffer);
       self.setVoicePhase('listening', '正在聆听 · 输入 ' + self.voiceInputLevel + '%');
-      self.sendSpeechAudioChunk(buffer);
+      if (self.voiceMode !== 'codex') {
+        self.sendSpeechAudioChunk(buffer);
+      }
       if (self.voiceCapturedBytes >= VOICE_SAMPLE_RATE * 2 * VOICE_MAX_SECONDS) {
         self.finishVoiceCapture();
         return;
@@ -615,6 +750,10 @@ export default {
       return;
     }
     var capturedBytes = this.voiceCapturedBytes;
+    var pcm = null;
+    if (this.voiceMode === 'codex') {
+      pcm = this.concatChunks(this.voicePcmChunks);
+    }
     this.stopMicCapture();
     this.voicePcmChunks = [];
     this.voiceCapturedBytes = 0;
@@ -622,6 +761,19 @@ export default {
       this.cancelSpeechSession();
       this.setVoicePhase('idle', '');
       this.showToast('说话时间太短，请再说一次');
+      return;
+    }
+    if (this.voiceMode === 'codex') {
+      var self = this;
+      this.setVoicePhase('thinking', '正在创建 Codex 任务…');
+      this.serviceStatus = 'Codex 创建中';
+      this.submitCodexVoice(pcm, 'voice').catch(function (error) {
+        if (self.destroyed) {
+          return;
+        }
+        self.setVoicePhase('idle', '');
+        self.showToast(self.describeCodexError(error));
+      });
       return;
     }
     this.setVoicePhase('transcribing', '正在整理语音文字…');
@@ -1197,9 +1349,13 @@ export default {
       this.setVoicePhase('idle', '');
       this.showToast('自动播报已关闭');
     } else {
-      this.showToast('自动播报已开启');
-      this.playSpeechText('语音播报已开启');
+      this.showToast('自动播报已开启，不会播放测试音');
     }
+  },
+
+  toggleHaptics() {
+    this.hapticsEnabled = !this.hapticsEnabled;
+    this.showToast(this.hapticsEnabled ? '触感反馈已开启' : '触感反馈已关闭');
   },
 
   switchToClassicInterface() {
@@ -1213,6 +1369,72 @@ export default {
       return base;
     }
     return base + (path.charAt(0) === '/' ? path : '/' + path);
+  },
+
+  getCodexServiceUrl(path) {
+    var base = CODE_BASE_URL.replace(/\/+$/, '');
+    if (!path) {
+      return base;
+    }
+    return base + (path.charAt(0) === '/' ? path : '/' + path);
+  },
+
+  codexHeaders() {
+    var headers = { 'Content-Type': 'application/json' };
+    if (CODE_TOKEN) {
+      headers['X-Nova-Token'] = CODE_TOKEN;
+    }
+    return headers;
+  },
+
+  ensureCodexConfigured() {
+    if (!CODE_BASE_URL) {
+      throw new Error('Codex 服务地址未内置');
+    }
+    if (!CODE_TOKEN) {
+      throw new Error('Codex 访问令牌未内置');
+    }
+  },
+
+  describeCodexError(error) {
+    var reason = error && (error.message || error.data) ?
+      (error.message || error.data) : String(error || '');
+    if (reason.indexOf('401') >= 0 || reason.indexOf('403') >= 0) {
+      return 'Codex 访问令牌无效';
+    }
+    if (reason.indexOf('409') >= 0) {
+      return '已有 Codex 任务正在执行';
+    }
+    if (reason.indexOf('未内置') >= 0) {
+      return reason;
+    }
+    if (reason.indexOf('timeout') >= 0 || reason.indexOf('timed out') >= 0) {
+      return 'Codex 服务响应超时';
+    }
+    return 'Codex 后端不可用';
+  },
+
+  codexRequest(url, options) {
+    var self = this;
+    var extraData = options.extraData;
+    if (extraData !== undefined && typeof extraData !== 'string' &&
+      !(extraData instanceof ArrayBuffer)) {
+      extraData = JSON.stringify(extraData);
+    }
+    return this.httpRequest(url, {
+      method: options.method || http.RequestMethod.GET,
+      header: options.header || {},
+      extraData: extraData,
+      connectTimeout: options.connectTimeout || 8000,
+      readTimeout: options.readTimeout || 30000
+    }).then(function (result) {
+      return { responseCode: result.responseCode || 200, result: result.result };
+    }).catch(function (error) {
+      var reason = error && (error.message || error.data) ?
+        (error.message || error.data) : String(error || '');
+      console.info('[NOVA_CODEX] request failed: ' + reason);
+      throw error;
+    });
   },
 
   networkRequest(url, options) {
@@ -1346,6 +1568,831 @@ export default {
     return result;
   },
 
+  concatChunks(chunks) {
+    var total = 0;
+    for (var i = 0; i < chunks.length; i++) {
+      total += chunks[i].byteLength;
+    }
+    if (!total) {
+      return new ArrayBuffer(0);
+    }
+    var result = new Uint8Array(total);
+    var offset = 0;
+    for (var j = 0; j < chunks.length; j++) {
+      result.set(new Uint8Array(chunks[j]), offset);
+      offset += chunks[j].byteLength;
+    }
+    return result.buffer;
+  },
+
+  encodeBase64Chunk(bytes, start, end) {
+    var chars = [];
+    for (var i = start; i < end; i += 3) {
+      var remaining = end - i;
+      var b0 = bytes[i];
+      var b1 = remaining > 1 ? bytes[i + 1] : 0;
+      var b2 = remaining > 2 ? bytes[i + 2] : 0;
+      chars.push(BASE64_ALPHABET.charAt(b0 >> 2));
+      chars.push(BASE64_ALPHABET.charAt(((b0 & 3) << 4) | (b1 >> 4)));
+      chars.push(remaining > 1 ?
+        BASE64_ALPHABET.charAt(((b1 & 15) << 2) | (b2 >> 6)) : '=');
+      chars.push(remaining > 2 ? BASE64_ALPHABET.charAt(b2 & 63) : '=');
+    }
+    return chars.join('');
+  },
+
+  encodePcmBase64(pcm) {
+    var self = this;
+    var bytes = pcm instanceof Uint8Array ? pcm : new Uint8Array(pcm);
+    return new Promise(function (resolve, reject) {
+      if (!bytes.length) {
+        resolve('');
+        return;
+      }
+      var parts = [];
+      var offset = 0;
+      function encodeNextChunk() {
+        try {
+          if (offset >= bytes.length) {
+            resolve(parts.join(''));
+            return;
+          }
+          var end = Math.min(bytes.length, offset + BASE64_CHUNK_BYTES);
+          parts.push(self.encodeBase64Chunk(bytes, offset, end));
+          offset = end;
+          setTimeout(encodeNextChunk, 0);
+        } catch (error) {
+          reject(error);
+        }
+      }
+      encodeNextChunk();
+    });
+  },
+
+  startRecording() {
+    var self = this;
+    this.stopVoiceResources();
+    this.stopRecordCaptureOnly();
+    this.recordRunning = true;
+    this.recordPaused = false;
+    this.recordHasProgress = true;
+    this.recordSeconds = 0;
+    this.recordTimer = '00:00';
+    this.recordStatus = '正在请求麦克风';
+    this.recordControlLabel = '暂停';
+    this.recordInputLevel = 0;
+    this.recordMarks = [];
+    this.recordPcmChunks = [];
+    this.recordText = '';
+    this.recordStartedAt = Date.now();
+    this.recordTicker = setInterval(function () {
+      if (!self.recordRunning) {
+        return;
+      }
+      self.recordSeconds = Math.floor((Date.now() - self.recordStartedAt) / 1000);
+      self.recordTimer = pad2(Math.floor(self.recordSeconds / 60)) + ':' +
+        pad2(self.recordSeconds % 60);
+    }, 500);
+    try {
+      var context = featureAbility.getContext();
+      context.requestPermissionsFromUser(['ohos.permission.MICROPHONE'], 102).then(function (result) {
+        if (self.destroyed) {
+          return;
+        }
+        var granted = result && result.authResults && result.authResults.length &&
+          result.authResults[0] === 0;
+        if (!granted) {
+          self.recordRunning = false;
+          self.recordHasProgress = false;
+          self.recordStatus = '未获得麦克风权限';
+          self.stopRecordingTickerOnly();
+          self.showToast('未获得麦克风权限');
+          return;
+        }
+        self.startRecordCapturer();
+      }).catch(function () {
+        self.recordRunning = false;
+        self.recordHasProgress = false;
+        self.recordStatus = '麦克风权限请求失败';
+        self.stopRecordingTickerOnly();
+        self.showToast('麦克风权限请求失败');
+      });
+    } catch (error) {
+      this.recordRunning = false;
+      this.recordHasProgress = false;
+      this.recordStatus = '麦克风不可用';
+      this.stopRecordingTickerOnly();
+      this.showToast('麦克风不可用');
+    }
+  },
+
+  startRecordCapturer() {
+    var self = this;
+    var options = {
+      streamInfo: {
+        samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_16000,
+        channels: audio.AudioChannel.CHANNEL_1,
+        sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_S16LE,
+        encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW
+      },
+      capturerInfo: {
+        source: audio.SourceType.SOURCE_TYPE_MIC,
+        capturerFlags: 0
+      }
+    };
+    this.stopRecordCaptureOnly();
+    audio.createAudioCapturer(options).then(function (capturer) {
+      self.recordAudioCapturer = capturer;
+      return capturer.start();
+    }).then(function () {
+      if (!self.recordRunning || !self.recordAudioCapturer) {
+        self.stopRecordCaptureOnly();
+        return;
+      }
+      self.recordCaptureActive = true;
+      self.recordStatus = '正在录音';
+      self.captureRecordChunk();
+      self.armRecordMaxDuration();
+    }).catch(function () {
+      self.recordCaptureActive = false;
+      self.recordRunning = false;
+      self.recordHasProgress = false;
+      self.recordStatus = '麦克风启动失败';
+      self.stopRecordingTickerOnly();
+      self.showToast('麦克风启动失败');
+    });
+  },
+
+  captureRecordChunk() {
+    var self = this;
+    if (!this.recordRunning || !this.recordAudioCapturer || !this.recordCaptureActive) {
+      return;
+    }
+    var capturer = this.recordAudioCapturer;
+    capturer.read(VOICE_CHUNK_BYTES, true).then(function (buffer) {
+      if (!self.recordRunning || !self.recordCaptureActive ||
+        self.recordAudioCapturer !== capturer) {
+        return;
+      }
+      self.recordPcmChunks.push(buffer);
+      self.recordInputLevel = self.computePcmLevel(buffer);
+      self.recordStatus = '正在录音 · 输入 ' + self.recordInputLevel + '%';
+      if (self.recordCapturedBytes() >= VOICE_SAMPLE_RATE * 2 * RECORD_MAX_SECONDS) {
+        self.finishRecording();
+        return;
+      }
+      self.captureRecordChunk();
+    }).catch(function () {
+      if (!self.recordRunning) {
+        return;
+      }
+      self.recordRunning = false;
+      self.recordStatus = '麦克风读取失败';
+      self.stopRecordingTickerOnly();
+      self.stopRecordCaptureOnly();
+      self.showToast('麦克风读取失败');
+    });
+  },
+
+  recordCapturedBytes() {
+    var total = 0;
+    for (var i = 0; i < this.recordPcmChunks.length; i++) {
+      total += this.recordPcmChunks[i].byteLength;
+    }
+    return total;
+  },
+
+  armRecordMaxDuration() {
+    var self = this;
+    if (this.recordMaxTimer) {
+      clearTimeout(this.recordMaxTimer);
+      this.recordMaxTimer = null;
+    }
+    if (!this.recordRunning) {
+      return;
+    }
+    var remaining = Math.max(1000, (RECORD_MAX_SECONDS - this.recordSeconds) * 1000);
+    this.recordMaxTimer = setTimeout(function () {
+      self.recordMaxTimer = null;
+      if (self.recordRunning) {
+        self.finishRecording();
+      }
+    }, remaining);
+  },
+
+  toggleRecording() {
+    if (this.recordRunning) {
+      this.pauseRecording();
+    } else if (this.recordHasProgress) {
+      this.resumeRecording();
+    } else {
+      this.startRecording();
+    }
+  },
+
+  pauseRecording() {
+    if (!this.recordRunning) {
+      return;
+    }
+    if (this.recordStartedAt) {
+      this.recordSeconds = Math.floor((Date.now() - this.recordStartedAt) / 1000);
+    }
+    this.stopRecordingTickerOnly();
+    this.stopRecordCaptureOnly();
+    this.recordRunning = false;
+    this.recordPaused = true;
+    this.recordHasProgress = true;
+    this.recordControlLabel = '继续';
+    this.recordTimer = pad2(Math.floor(this.recordSeconds / 60)) + ':' +
+      pad2(this.recordSeconds % 60);
+    this.recordStatus = '录音已暂停';
+    this.showToast('录音已暂停');
+  },
+
+  resumeRecording() {
+    if (this.recordRunning) {
+      return;
+    }
+    this.stopRecordingTickerOnly();
+    this.recordRunning = true;
+    this.recordPaused = false;
+    this.recordHasProgress = true;
+    this.recordStatus = '正在继续录音';
+    this.recordControlLabel = '暂停';
+    this.recordStartedAt = Date.now() - this.recordSeconds * 1000;
+    var self = this;
+    this.recordTicker = setInterval(function () {
+      self.recordSeconds = Math.floor((Date.now() - self.recordStartedAt) / 1000);
+      self.recordTimer = pad2(Math.floor(self.recordSeconds / 60)) + ':' +
+        pad2(self.recordSeconds % 60);
+    }, 500);
+    this.startRecordCapturer();
+    this.showToast('继续录音');
+  },
+
+  finishRecording() {
+    if (!this.recordHasProgress) {
+      return;
+    }
+    var self = this;
+    if (this.recordRunning && this.recordStartedAt) {
+      this.recordSeconds = Math.floor((Date.now() - this.recordStartedAt) / 1000);
+    }
+    this.stopRecordingTickerOnly();
+    this.stopRecordCaptureOnly();
+    this.recordRunning = false;
+    this.recordPaused = false;
+    this.recordControlLabel = '开始录音';
+    if (!this.recordPcmChunks.length || this.recordCapturedBytes() < VOICE_SAMPLE_RATE / 2) {
+      this.recordHasProgress = false;
+      this.recordStatus = '录音太短，请重试';
+      this.recordPcmChunks = [];
+      this.showToast('录音太短，请重试');
+      return;
+    }
+    var pcm = this.concatChunks(this.recordPcmChunks);
+    this.recordPcmChunks = [];
+    this.recordStatus = '正在转写并创建任务';
+    this.showToast('录音完成，正在提交');
+    this.submitCodexVoice(pcm, 'record').catch(function (error) {
+      if (self.destroyed) {
+        return;
+      }
+      self.recordHasProgress = false;
+      self.recordStatus = '提交失败 · 请重新录音';
+      self.showToast(self.describeCodexError(error));
+    });
+  },
+
+  markRecording() {
+    if (!this.recordHasProgress) {
+      this.showToast('请先开始录音');
+      return;
+    }
+    this.recordMarks.push(this.recordTimer);
+    this.showToast('已标记 ' + this.recordTimer);
+  },
+
+  resetRecordingState() {
+    this.stopRecordingTickerOnly();
+    this.stopRecordCaptureOnly();
+    this.recordRunning = false;
+    this.recordPaused = false;
+    this.recordHasProgress = false;
+    this.recordSeconds = 0;
+    this.recordTimer = '00:00';
+    this.recordStatus = '轻触开始录音';
+    this.recordControlLabel = '开始录音';
+    this.recordInputLevel = 0;
+    this.recordMarks = [];
+    this.recordPcmChunks = [];
+  },
+
+  stopRecordingTickerOnly() {
+    if (this.recordTicker) {
+      clearInterval(this.recordTicker);
+      this.recordTicker = null;
+    }
+  },
+
+  stopRecordCaptureOnly() {
+    var capturer = this.recordAudioCapturer;
+    this.recordAudioCapturer = null;
+    this.recordCaptureActive = false;
+    if (this.recordMaxTimer) {
+      clearTimeout(this.recordMaxTimer);
+      this.recordMaxTimer = null;
+    }
+    if (!capturer) {
+      return;
+    }
+    try {
+      capturer.stop().then(function () {
+        return capturer.release();
+      }).catch(function () {
+        try { capturer.release(); } catch (error) {}
+      });
+    } catch (error) {
+      try { capturer.release(); } catch (releaseError) {}
+    }
+  },
+
+  submitCodexVoice(pcm, origin) {
+    var self = this;
+    return new Promise(function (resolve, reject) {
+      try {
+        self.ensureCodexConfigured();
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      if (origin === 'voice') {
+        self.codexChatThreadId = self.currentThreadId;
+        self.codexUserCommitted = false;
+        self.codexAssistantCommitted = false;
+      }
+      self.encodePcmBase64(pcm).then(function (encoded) {
+        return self.codexRequest(self.getCodexServiceUrl('/api/codex/voice'), {
+          method: http.RequestMethod.POST,
+          header: self.codexHeaders(),
+          extraData: {
+            pcmBase64: encoded,
+            sampleRate: VOICE_SAMPLE_RATE,
+            repoId: self.codexRepoId,
+            mode: 'readonly'
+          },
+          connectTimeout: 10000,
+          readTimeout: 60000
+        });
+      }).then(function (result) {
+        var payload = self.parseHttpResult(result.result);
+        if (!payload.taskId) {
+          throw new Error(payload.error || '任务创建失败');
+        }
+        self.adoptCodexTask(payload, origin);
+        resolve(payload);
+      }).catch(function (error) {
+        reject(error);
+      });
+    });
+  },
+
+  submitCodexText(prompt, transcript) {
+    var self = this;
+    return new Promise(function (resolve, reject) {
+      try {
+        self.ensureCodexConfigured();
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      self.codexChatThreadId = self.currentThreadId;
+      self.codexAssistantCommitted = false;
+      self.codexRequest(self.getCodexServiceUrl('/api/codex/task'), {
+        method: http.RequestMethod.POST,
+        header: self.codexHeaders(),
+        extraData: {
+          prompt: prompt,
+          transcript: transcript || prompt,
+          repoId: self.codexRepoId,
+          mode: 'readonly'
+        },
+        connectTimeout: 10000,
+        readTimeout: 30000
+      }).then(function (result) {
+        var payload = self.parseHttpResult(result.result);
+        if (!payload.taskId) {
+          throw new Error(payload.error || '任务创建失败');
+        }
+        self.adoptCodexTask(payload, 'text');
+        resolve(payload);
+      }).catch(function (error) {
+        reject(error);
+      });
+    });
+  },
+
+  adoptCodexTask(payload, origin) {
+    this.codexTaskId = payload.taskId;
+    this.codexStatus = payload.status || 'queued';
+    this.codexStage = payload.stage || '已排队';
+    this.codexMessage = payload.message || '等待 Codex 执行';
+    this.codexTranscript = payload.transcript || '';
+    this.codexFinalText = payload.finalText || '';
+    this.codexSpeechText = payload.speechText || '';
+    this.codexError = payload.error || '';
+    this.codexElapsedText = this.formatElapsed(payload.elapsedMs || 0);
+    this.codexOrigin = origin || 'voice';
+    if (this.codexOrigin === 'record' && this.codexTranscript) {
+      this.recordText = this.codexTranscript;
+      this.resetRecordingState();
+    }
+    if (this.codexOrigin === 'voice' && this.codexTranscript &&
+      !this.codexUserCommitted) {
+      this.appendMessageToThread(this.codexChatThreadId, {
+        role: 'user',
+        text: this.codexTranscript
+      });
+      this.codexUserCommitted = true;
+    }
+    this.stopCodexPolling();
+    this.stopVoiceResources();
+    this.stopRecordCaptureOnly();
+    this.voicePcmChunks = [];
+    this.recordPcmChunks = [];
+    this.setVoicePhase('idle', '');
+    this.upsertTaskHistory();
+    this.subPage = 'task';
+    this.mainVisible = false;
+    this.startCodexPolling();
+  },
+
+  formatElapsed(milliseconds) {
+    var seconds = Math.max(0, Math.floor((milliseconds || 0) / 1000));
+    return pad2(Math.floor(seconds / 60)) + ':' + pad2(seconds % 60);
+  },
+
+  codexStatusLabel(status) {
+    if (status === 'succeeded') {
+      return '完成';
+    }
+    if (status === 'failed') {
+      return '失败';
+    }
+    if (status === 'cancelled') {
+      return '已停止';
+    }
+    if (status === 'running') {
+      return '执行中';
+    }
+    return '已排队';
+  },
+
+  codexStatusClass(status) {
+    if (status === 'succeeded') {
+      return 'status-success';
+    }
+    if (status === 'failed') {
+      return 'status-failed';
+    }
+    if (status === 'cancelled') {
+      return 'status-muted';
+    }
+    return 'status-running';
+  },
+
+  isCodexTerminal(status) {
+    return status === 'succeeded' || status === 'failed' || status === 'cancelled';
+  },
+
+  upsertTaskHistory() {
+    if (!this.codexTaskId) {
+      return;
+    }
+    var title = (this.codexTranscript || this.recordText || 'Codex 只读任务')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (title.length > 16) {
+      title = title.substring(0, 16) + '…';
+    }
+    var item = {
+      id: this.codexTaskId,
+      title: title || 'Codex 只读任务',
+      subtitle: this.codexStage + ' · ' + this.codexElapsedText,
+      status: this.codexStatus,
+      statusLabel: this.codexStatusLabel(this.codexStatus),
+      statusClass: this.codexStatusClass(this.codexStatus),
+      stage: this.codexStage,
+      elapsedText: this.codexElapsedText,
+      transcript: this.codexTranscript,
+      finalText: this.codexFinalText,
+      speechText: this.codexSpeechText,
+      error: this.codexError,
+      origin: this.codexOrigin
+    };
+    var next = [item];
+    for (var i = 0; i < this.taskHistory.length; i++) {
+      if (this.taskHistory[i].id !== item.id) {
+        next.push(this.taskHistory[i]);
+      }
+      if (next.length >= 8) {
+        break;
+      }
+    }
+    this.taskHistory = next;
+  },
+
+  applyCodexSnapshot(payload) {
+    this.codexStatus = payload.status || this.codexStatus;
+    this.codexStage = payload.stage || this.codexStage;
+    this.codexMessage = payload.message || this.codexMessage;
+    this.codexTranscript = payload.transcript || this.codexTranscript;
+    this.codexFinalText = payload.finalText || this.codexFinalText;
+    this.codexSpeechText = payload.speechText || this.codexSpeechText;
+    this.codexError = payload.error || '';
+    this.codexElapsedText = this.formatElapsed(payload.elapsedMs || 0);
+    if (this.codexOrigin === 'record' && this.codexTranscript) {
+      this.recordText = this.codexTranscript;
+    }
+    if (this.codexOrigin === 'voice' && this.codexTranscript &&
+      !this.codexUserCommitted) {
+      this.appendMessageToThread(this.codexChatThreadId, {
+        role: 'user',
+        text: this.codexTranscript
+      });
+      this.codexUserCommitted = true;
+    }
+    this.upsertTaskHistory();
+  },
+
+  startCodexPolling(delay) {
+    var self = this;
+    if (!this.codexTaskId || this.codexPollTimer) {
+      return;
+    }
+    if (this.subPage !== 'task' && this.subPage !== 'result') {
+      return;
+    }
+    this.codexPollTimer = setTimeout(function () {
+      self.codexPollTimer = null;
+      self.pollCodexTask();
+    }, delay === undefined ? CODEX_POLL_MS : delay);
+  },
+
+  stopCodexPolling() {
+    if (this.codexPollTimer) {
+      clearTimeout(this.codexPollTimer);
+      this.codexPollTimer = null;
+    }
+  },
+
+  pollCodexTask() {
+    var self = this;
+    if (!this.codexTaskId || (this.subPage !== 'task' && this.subPage !== 'result')) {
+      return;
+    }
+    this.codexRequest(this.getCodexServiceUrl('/api/codex/task/' + this.codexTaskId), {
+      method: http.RequestMethod.GET,
+      header: this.codexHeaders(),
+      connectTimeout: 8000,
+      readTimeout: 15000
+    }).then(function (result) {
+      var payload = self.parseHttpResult(result.result);
+      self.applyCodexSnapshot(payload);
+      if (payload.status === 'succeeded') {
+        self.showCodexResult();
+        return;
+      }
+      if (payload.status === 'failed' || payload.status === 'cancelled') {
+        self.showToast(payload.status === 'cancelled' ? '任务已停止' : '任务执行失败');
+        return;
+      }
+      self.startCodexPolling();
+    }).catch(function () {
+      if (self.subPage !== 'task' && self.subPage !== 'result') {
+        return;
+      }
+      self.codexStage = '连接中断';
+      self.codexMessage = '任务仍在 PC 执行，恢复连接后继续同步';
+      self.startCodexPolling(3000);
+    });
+  },
+
+  showCodexResult() {
+    this.summaryItems = this.buildCodexSummary(this.codexFinalText);
+    this.resultTranscriptText = this.codexTranscript || this.codexFinalText;
+    this.resultTab = 'summary';
+    this.editingTranscript = false;
+    this.subPage = 'result';
+    this.mainVisible = false;
+    this.stopCodexPolling();
+    this.upsertTaskHistory();
+    if ((this.codexOrigin === 'text' || this.codexOrigin === 'voice') &&
+      !this.codexAssistantCommitted && this.codexFinalText) {
+      this.appendMessageToThread(this.codexChatThreadId, {
+        role: 'assistant',
+        text: this.codexFinalText
+      });
+      this.codexAssistantCommitted = true;
+    }
+  },
+
+  buildCodexSummary(text) {
+    var source = (text || '').replace(/\r/g, '').trim();
+    if (!source) {
+      return ['Codex 未返回内容'];
+    }
+    var lines = source.split('\n');
+    var items = [];
+    for (var i = 0; i < lines.length && items.length < 4; i++) {
+      var line = lines[i].replace(/^\s*(?:#{1,6}|[-*+]|\d+[.)])\s*/, '').trim();
+      if (line && line.indexOf('```') < 0 && line.charAt(0) !== '|') {
+        items.push(line);
+      }
+    }
+    if (items.length <= 1) {
+      var sentences = source.match(/[^。！？；]+[。！？；]?/g) || [source];
+      items = [];
+      for (var j = 0; j < sentences.length && items.length < 4; j++) {
+        var sentence = sentences[j].trim();
+        if (sentence) {
+          items.push(sentence);
+        }
+      }
+    }
+    return items.length ? items : [source.substring(0, 120)];
+  },
+
+  cancelCodexTask() {
+    var self = this;
+    if (!this.codexTaskId || this.isCodexTerminal(this.codexStatus)) {
+      return;
+    }
+    this.codexStage = '正在停止';
+    this.codexMessage = '正在结束 Codex 子进程';
+    this.codexRequest(this.getCodexServiceUrl('/api/codex/task/' + this.codexTaskId + '/cancel'), {
+      method: http.RequestMethod.POST,
+      header: this.codexHeaders(),
+      extraData: {},
+      connectTimeout: 8000,
+      readTimeout: 15000
+    }).then(function () {
+      self.startCodexPolling(500);
+    }).catch(function (error) {
+      self.showToast(self.describeCodexError(error));
+    });
+  },
+
+  openCodexTask(item) {
+    if (!item || !item.id) {
+      return;
+    }
+    this.codexTaskId = item.id;
+    this.codexStatus = item.status || 'queued';
+    this.codexStage = item.stage || '正在同步';
+    this.codexMessage = '读取任务状态';
+    this.codexTranscript = item.transcript || '';
+    this.codexFinalText = item.finalText || '';
+    this.codexSpeechText = item.speechText || '';
+    this.codexError = item.error || '';
+    this.codexElapsedText = item.elapsedText || '00:00';
+    this.codexOrigin = 'history';
+    this.codexChatThreadId = '';
+    this.codexAssistantCommitted = true;
+    this.mainVisible = false;
+    if (this.codexStatus === 'succeeded' && this.codexFinalText) {
+      this.showCodexResult();
+      return;
+    }
+    this.subPage = 'task';
+    this.startCodexPolling(0);
+  },
+
+  openLatestCodexTask() {
+    if (this.taskHistory.length) {
+      this.openCodexTask(this.taskHistory[0]);
+    }
+  },
+
+  appendMessageToThread(threadId, message) {
+    var thread = this.findThread(threadId);
+    if (!thread || !message) {
+      return;
+    }
+    var messages = copyMessages(thread.messages);
+    messages.push({ role: message.role, text: message.text });
+    thread.messages = messages;
+    thread.preview = message.text.length > 24 ?
+      message.text.substring(0, 24) + '…' : message.text;
+    if (message.role === 'user' && thread.title === '新对话') {
+      thread.title = message.text.length > 12 ?
+        message.text.substring(0, 12) + '…' : message.text;
+    }
+    if (this.currentThreadId === threadId) {
+      this.chatMessages = copyMessages(messages);
+      this.chatTitle = thread.title;
+    }
+  },
+
+  copyText(value, name) {
+    var self = this;
+    var text = String(value || '').trim();
+    if (!text) {
+      this.showToast('没有可复制的内容');
+      return;
+    }
+    try {
+      var data = pasteboard.createPlainTextData(text);
+      pasteboard.getSystemPasteboard().setPasteData(data, function (error) {
+        self.showToast(error ? '复制失败，请检查剪贴板权限' : name + '已复制');
+      });
+    } catch (error) {
+      this.showToast('复制失败，无法访问剪贴板');
+    }
+  },
+
+  copyVoiceAnswer() {
+    this.copyText(this.voiceAnswerText, '回答');
+  },
+
+  continueVoiceChat() {
+    this.stopVoicePlayback();
+    this.subPage = 'chat';
+    this.mainVisible = false;
+    this.setVoicePhase('idle', '');
+  },
+
+  showTranscript() {
+    this.resultTab = 'transcript';
+    this.editingTranscript = false;
+  },
+
+  showSummary() {
+    this.resultTab = 'summary';
+    this.editingTranscript = false;
+  },
+
+  beginTranscriptEdit() {
+    if (this.resultTab !== 'transcript') {
+      return;
+    }
+    this.editBuffer = this.resultTranscriptText;
+    this.editingTranscript = true;
+  },
+
+  onTranscriptInput(event) {
+    this.editBuffer = event && typeof event.value === 'string' ? event.value : '';
+  },
+
+  saveTranscript() {
+    var value = (this.editBuffer || '').trim();
+    if (!value) {
+      this.showToast('转写内容不能为空');
+      return;
+    }
+    this.resultTranscriptText = value;
+    this.codexTranscript = value;
+    this.editingTranscript = false;
+    this.upsertTaskHistory();
+    this.showToast('转写文本已保存');
+  },
+
+  copyResult() {
+    if (this.resultTab === 'summary') {
+      this.copyText(this.summaryItems.join('\n'), '摘要');
+      return;
+    }
+    this.copyText(this.resultTranscriptText, '转写');
+  },
+
+  continueFromResult() {
+    this.stopVoiceResources();
+    this.stopVoicePlayback();
+    var id = 'thread-' + Date.now();
+    var question = this.resultTranscriptText || this.codexTranscript || 'Codex 任务结果';
+    var answer = this.codexFinalText || this.summaryItems.join('\n');
+    var messages = [
+      { role: 'user', text: question },
+      { role: 'assistant', text: answer }
+    ];
+    var title = question.length > 12 ? question.substring(0, 12) + '…' : question;
+    this.threads.push({
+      id: id,
+      title: title || '继续追问',
+      preview: answer.length > 24 ? answer.substring(0, 24) + '…' : answer,
+      mark: '＋',
+      messages: messages
+    });
+    this.currentThreadId = id;
+    this.chatTitle = title || '继续追问';
+    this.chatMessages = copyMessages(messages);
+    this.chatInput = '';
+    this.voiceModeLabel = 'Magpie 即时';
+    this.setVoicePhase('idle', '');
+    this.subPage = 'chat';
+    this.mainVisible = false;
+  },
+
   replacePendingAssistant(pending, finalText) {
     var messages = copyMessages(this.chatMessages);
     for (var i = messages.length - 1; i >= 0; i--) {
@@ -1375,6 +2422,37 @@ export default {
       this.setVoicePhase('idle', '');
       this.showToast('上一条消息还在生成');
       return Promise.resolve(false);
+    }
+    if (this.voiceMode === 'codex') {
+      var codexMessages = copyMessages(this.chatMessages);
+      codexMessages.push({ role: 'user', text: text });
+      this.chatMessages = codexMessages;
+      if (this.chatTitle === '新对话') {
+        this.chatTitle = text.length > 12 ? text.substring(0, 12) + '…' : text;
+      }
+      this.syncCurrentThread();
+      this.chatInput = '';
+      this.chatRequestPending = true;
+      this.codexUserCommitted = true;
+      this.codexAssistantCommitted = false;
+      this.serviceStatus = 'Codex 创建中';
+      this.setVoicePhase('thinking', '正在创建 Codex 只读任务…');
+      return this.submitCodexText(text, text).then(function () {
+        self.chatRequestPending = false;
+        return true;
+      }).catch(function (error) {
+        var message = self.describeCodexError(error);
+        self.chatRequestPending = false;
+        self.codexUserCommitted = false;
+        self.appendMessageToThread(self.currentThreadId, {
+          role: 'assistant',
+          text: 'Codex 任务创建失败：' + message
+        });
+        self.setVoicePhase('idle', '');
+        self.serviceStatus = 'Codex 不可用';
+        self.showToast(message);
+        return false;
+      });
     }
     var context = [];
     var start = this.chatMessages.length > MAX_CONTEXT_MESSAGES ?
@@ -1432,7 +2510,14 @@ export default {
       self.chatRequestPending = false;
       self.serviceStatus = '已连接';
       self.replacePendingAssistant(pending, reply);
-      if (self.subPage === 'chat' && self.voiceOutputEnabled) {
+      if (fromVoice) {
+        self.voiceQuestionText = text;
+        self.voiceAnswerText = reply;
+        self.stopVoicePlayback();
+        self.setVoicePhase('idle', '');
+        self.subPage = 'answer';
+        self.mainVisible = false;
+      } else if (self.subPage === 'chat' && self.voiceOutputEnabled) {
         self.playSpeechText(reply);
       } else {
         self.setVoicePhase('idle', '');
