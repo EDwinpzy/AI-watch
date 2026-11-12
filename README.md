@@ -4,7 +4,7 @@
 `api8-watch/`，PC 本地服务负责 Whisper 转写与只读 `codex exec` 任务，
 手表只显示文字，不播放 TTS、提示音或其他音频。
 
-当前版本：`1.2.0 / versionCode 3`。
+当前版本：`1.2.1 / versionCode 4`。
 
 ## 当前能力
 
@@ -87,7 +87,7 @@ python scripts/test_codex_bridge.py --long
 python scripts\test_release_e2e.py `
   --base-url http://192.168.1.129:8787 `
   --token <token> `
-  --voice-pcm artifacts\release-v1.2.0\e2e\voice-input-16k.pcm
+  --voice-pcm artifacts\release-v1.2.1\e2e\voice-input-16k.pcm
 ```
 
 API 8 HAP 构建方法见 [api8-watch/README.md](api8-watch/README.md)。
@@ -100,6 +100,8 @@ release 构建、包内容静音检查和 HAP 签名校验。
 - Codex 路由要求 `X-Nova-Token` 或 Bearer Token。
 - 第一版仅 `read-only`，写模式必须使用独立 worktree。
 - HAP、签名材料、音频、任务日志和本地服务日志不纳入 Git。
+- `api8-watch/build-profile.json5` 是忽略的本机文件，只保存生成后的签名配置；
+  仓库仅跟踪无凭据模板，避免证书路径和口令再次入库。
 - 明文 HTTP 只用于可信局域网验证；公网部署必须增加 HTTPS、限流和密钥托管。
 - 当前本机签名证书只生成可安装 HAP，不等同于 AppGallery 正式发布证书。
 
@@ -112,5 +114,5 @@ release 构建、包内容静音检查和 HAP 签名校验。
 - [PC 服务与 Codex 任务桥](docs/AI_SERVICE.md)
 - [手表 API 接入](docs/API_INTEGRATION.md)
 - [QA 清单](docs/QA_CHECKLIST.md)
-- [v1.2.0 发布说明](docs/RELEASE_NOTES_v1.2.0.md)
+- [v1.2.1 发布说明](docs/RELEASE_NOTES_v1.2.1.md)
 - [Aurora Watch 原型](prototypes/aurora-watch/README.md)

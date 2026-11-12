@@ -23,7 +23,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from codex_bridge import CodexTaskManager, compact_speech_text
+from codex_bridge import CodexRunner, CodexTaskManager, compact_speech_text
 
 
 FAKE_CODEX = r'''
@@ -42,6 +42,12 @@ sys.stdin.reconfigure(encoding="utf-8")
 sys.stdout.reconfigure(encoding="utf-8")
 prompt = sys.stdin.read()
 Path(os.environ["FAKE_CODEX_PROMPT_FILE"]).write_text(prompt, encoding="utf-8")
+env_file = os.environ.get("FAKE_CODEX_ENV_FILE")
+if env_file:
+    Path(env_file).write_text(json.dumps({
+        "registeredCore": os.environ.get("CODEX_WINDOWS_REGISTERED_CORE", ""),
+        "sandboxFamily": os.environ.get("CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY", ""),
+    }), encoding="utf-8")
 
 print(json.dumps({"type": "thread.started", "thread_id": "fake-thread"}), flush=True)
 if mode == "fail":
@@ -164,6 +170,44 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertLessEqual(len(spoken), 120)
         self.assertNotIn("```", spoken)
         self.assertTrue(spoken.startswith("结论"))
+
+    def test_child_environment_removes_desktop_sandbox_markers(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "CODEX_WINDOWS_REGISTERED_CORE": "1",
+                "CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY": "OpenAI.Codex_test",
+            },
+            clear=False,
+        ):
+            environment = CodexRunner._child_environment()
+        self.assertNotIn("CODEX_WINDOWS_REGISTERED_CORE", environment)
+        self.assertNotIn("CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY", environment)
+        self.assertIn("PATH", environment)
+
+    def test_spawned_codex_does_not_inherit_desktop_sandbox_markers(self) -> None:
+        server, port = _open_backend()
+        env_file = self.root / "fake-env.json"
+        os.environ["FAKE_CODEX_ENV_FILE"] = str(env_file)
+        os.environ["CODEX_WINDOWS_REGISTERED_CORE"] = "1"
+        os.environ["CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY"] = "OpenAI.Codex_test"
+        try:
+            manager = self.manager(port)
+            task = manager.create(
+                prompt="检查子进程环境",
+                transcript="检查子进程环境",
+                repo_id="watch",
+                mode="readonly",
+            )
+            result = self.wait_terminal(manager, task["taskId"])
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(
+            json.loads(env_file.read_text(encoding="utf-8")),
+            {"registeredCore": "", "sandboxFamily": ""},
+        )
 
     def test_success_parses_jsonl_and_redacts_prompt_logs(self) -> None:
         server, port = _open_backend()
@@ -342,6 +386,11 @@ class HttpRouteTests(unittest.TestCase):
         root = Path(cls.temp.name)
         audio = root / "audio"
         audio.mkdir()
+        cls.logs = []
+
+        def capture_log(**payload) -> None:
+            cls.logs.append(payload)
+
         cls.runtime = SimpleNamespace(
             args=SimpleNamespace(
                 allow_client={"127.0.0.1"},
@@ -352,7 +401,7 @@ class HttpRouteTests(unittest.TestCase):
             ),
             codex=_FakeCodexManager(),
             audio_dir=audio,
-            log=lambda **payload: None,
+            log=capture_log,
             transcribe=lambda pcm: {
                 "requestId": "asr-1",
                 "transcript": "检查仓库结构",
@@ -397,6 +446,7 @@ class HttpRouteTests(unittest.TestCase):
             return exc.code, json.loads(exc.read().decode("utf-8"))
 
     def test_old_voice_route_still_works(self) -> None:
+        self.logs.clear()
         pcm = base64.b64encode(b"\x00\x00" * 64).decode("ascii")
         status, payload = self.request(
             "/api/voice",
@@ -405,6 +455,12 @@ class HttpRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["reply"], "旧语音链路正常")
         self.assertEqual(payload["transcript"], "检查仓库结构")
+        raw_log = json.dumps(self.logs, ensure_ascii=False)
+        self.assertNotIn("检查仓库结构", raw_log)
+        self.assertNotIn("旧语音链路正常", raw_log)
+        pipeline = [row for row in self.logs if row.get("event") == "voice_pipeline_done"]
+        self.assertEqual(pipeline[-1]["transcriptChars"], len("检查仓库结构"))
+        self.assertEqual(pipeline[-1]["replyChars"], len("旧语音链路正常"))
 
     def test_codex_routes_require_token(self) -> None:
         status, payload = self.request(
@@ -413,6 +469,16 @@ class HttpRouteTests(unittest.TestCase):
         )
         self.assertEqual(status, 401)
         self.assertFalse(payload["ok"])
+
+    def test_codex_rejects_empty_prompt(self) -> None:
+        status, payload = self.request(
+            "/api/codex/task",
+            payload={"prompt": "   ", "repoId": "watch"},
+            token="secret-token",
+        )
+        self.assertEqual(status, 400)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"], "prompt is required")
 
     def test_codex_task_and_poll(self) -> None:
         status, created = self.request(
@@ -427,6 +493,25 @@ class HttpRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(polled["status"], "succeeded")
         self.assertEqual(polled["finalText"], "完成")
+
+    def test_codex_voice_accepts_raw_pcm(self) -> None:
+        request = urllib.request.Request(
+            self.base + "/api/codex/voice",
+            data=b"\x00\x00" * 64,
+            headers={
+                "Content-Type": "application/octet-stream",
+                "X-Nova-Token": "secret-token",
+                "X-Nova-Sample-Rate": "16000",
+                "X-Nova-Repo-Id": "watch",
+                "X-Nova-Mode": "readonly",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(response.status, 200)
+        self.assertEqual(payload["transcript"], "检查仓库结构")
+        self.assertEqual(payload["status"], "queued")
 
     def test_health_reports_codex(self) -> None:
         status, payload = self.request("/health")
@@ -475,6 +560,78 @@ class ServiceRuntimeTests(unittest.TestCase):
         self.assertEqual(model.options["language"], "zh")
         self.assertFalse(model.options["condition_on_previous_text"])
         self.assertIn("简体中文", model.options["initial_prompt"])
+
+    def test_transcribe_log_redacts_transcript(self) -> None:
+        artifacts = SCRIPT_DIR.parent / "artifacts"
+        artifacts.mkdir(exist_ok=True)
+        logs = []
+        transcript = "这是敏感的语音转写"
+        with tempfile.TemporaryDirectory(dir=artifacts) as temp:
+            runtime = object.__new__(self.ai_service.Runtime)
+            runtime.audio_dir = Path(temp)
+            runtime.whisper_lock = threading.Lock()
+            runtime.log = lambda **payload: logs.append(payload)
+            runtime.args = SimpleNamespace(whisper_model="small")
+            runtime.whisper_model = SimpleNamespace(
+                device=SimpleNamespace(type="cpu"),
+                transcribe=lambda _path, **_options: {"text": transcript},
+            )
+            result = runtime.transcribe(b"\x00\x00" * 160)
+        self.assertEqual(result["transcript"], transcript)
+        self.assertNotIn(transcript, json.dumps(logs, ensure_ascii=False))
+        asr = [row for row in logs if row.get("event") == "asr_done"]
+        self.assertEqual(asr[-1]["transcriptChars"], len(transcript))
+
+    def test_chat_log_redacts_prompt_and_reply(self) -> None:
+        prompt = "敏感提示词"
+        reply = "敏感模型回答"
+        logs = []
+        runtime = object.__new__(self.ai_service.Runtime)
+        runtime.args = SimpleNamespace(ollama_timeout=1)
+        runtime.log = lambda **payload: logs.append(payload)
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "model": "fake-ollama",
+                    "response": reply,
+                    "done": True,
+                }, ensure_ascii=False).encode("utf-8")
+
+        with mock.patch.object(self.ai_service, "urlopen", return_value=FakeResponse()):
+            result = runtime.chat(prompt, "fake-ollama")
+        self.assertEqual(result["reply"], reply)
+        self.assertNotIn(prompt, json.dumps(logs, ensure_ascii=False))
+        self.assertNotIn(reply, json.dumps(logs, ensure_ascii=False))
+        model = [row for row in logs if row.get("event") == "model_done"]
+        self.assertEqual(model[-1]["promptChars"], len(prompt))
+        self.assertEqual(model[-1]["replyChars"], len(reply))
+
+    def test_tts_log_redacts_text(self) -> None:
+        text = "不应写入日志的语音正文"
+        logs = []
+        with tempfile.TemporaryDirectory(dir=SCRIPT_DIR.parent / "artifacts") as temp:
+            runtime = object.__new__(self.ai_service.Runtime)
+            runtime.audio_dir = Path(temp)
+            runtime.args = SimpleNamespace(tts_timeout=1)
+            runtime.log = lambda **payload: logs.append(payload)
+
+            def fake_run(*_args, **kwargs):
+                Path(kwargs["env"]["NOVA_TTS_OUT"]).write_bytes(b"RIFF")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(self.ai_service.subprocess, "run", side_effect=fake_run):
+                result = runtime.synthesize(text)
+            self.assertTrue(result.exists())
+        self.assertNotIn(text, json.dumps(logs, ensure_ascii=False))
+        tts = [row for row in logs if row.get("event") == "tts_done"]
+        self.assertEqual(tts[-1]["textChars"], len(text))
 
 
 def main() -> None:

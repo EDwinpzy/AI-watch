@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.aiwatch.watch",
     "vendor": "aiwatch",
-    "versionCode": 3,
-    "versionName": "1.2.0",
+    "versionCode": 4,
+    "versionName": "1.2.1",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
   }

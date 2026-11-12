@@ -171,12 +171,16 @@
       <image class="chip-icon" src="/common/interface-icons/openai-white.png"></image>
       <text class="chip-text">{{voiceMode === 'codex' ? 'Codex · 只读' : 'Ollama · 即时'}}</text>
     </div>
-    <div class="voice-ring-wrap" @click="simulateVoiceTurn">
+    <div class="voice-ring-wrap"
+      @touchstart="startVoicePress"
+      @touchmove="onVoiceTouchMove"
+      @touchend="onVoiceTouchEnd"
+      @touchcancel="onVoiceTouchCancel">
       <div class="voice-ring-outer"></div>
       <div class="voice-ring-mid"></div>
       <div class="voice-core">
         <image class="voice-mic" src="/common/control-icons/mic.png"></image>
-        <text class="voice-cta">按住说话</text>
+        <text class="voice-cta">{{voiceCta}}</text>
       </div>
     </div>
     <div class="voice-live">

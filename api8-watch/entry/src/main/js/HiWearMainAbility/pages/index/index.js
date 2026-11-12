@@ -17,9 +17,13 @@ function copyMessages(messages) {
 
 var VOICE_SAMPLE_RATE = 16000;
 var VOICE_CHUNK_BYTES = 6400;
+var BASE64_CHUNK_BYTES = 6144;
 var VOICE_MAX_SECONDS = 15;
+var VOICE_END_SLIDE_PX = 28;
+var VOICE_CANCEL_SLIDE_X_PX = 32;
 var RECORD_MAX_SECONDS = 60;
 var CODEX_POLL_MS = 1500;
+var BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 var LOCAL_SERVICE_URL = 'http://192.168.1.129:8787';
 var LOCAL_MODEL = 'translategemma:4b';
 var WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -38,7 +42,9 @@ export default {
     voiceActive: false,
     voiceState: 'idle',
     voiceTimer: '00:00',
-    voiceStatus: '正在聆听',
+    voiceStatus: '按住说话 · 上滑结束',
+    voiceCta: '按住说话',
+    voiceEndArmed: false,
     voiceResponseText: '',
     voiceAnswerText: '',
     voiceMode: 'codex',
@@ -174,6 +180,9 @@ export default {
     this.voiceCaptureActive = false;
     this.recordCaptureActive = false;
     this.voiceCaptureStarting = false;
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     this.voiceStartedAt = 0;
     this.recordStartedAt = 0;
     this.chatSwipeAt = 0;
@@ -424,10 +433,47 @@ export default {
   },
 
   startVoice() {
-    var self = this;
     this.voiceParentSubPage = this.subPage === 'chat' ? 'chat' : '';
-    this.openSubPage('voice');
     this.clearVoiceTimers();
+    this.stopVoiceResources();
+    this.openSubPage('voice');
+    this.voiceActive = false;
+    this.voiceState = 'idle';
+    this.voiceStatus = '按住说话 · 上滑结束';
+    this.voiceCta = '按住说话';
+    this.voiceEndArmed = false;
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
+    this.voiceResponseText = '';
+    this.voiceTranscriptText = '';
+    this.voiceTimer = '00:00';
+    this.voiceStartedAt = 0;
+    this.voicePcmChunks = [];
+    this.voiceCapturedBytes = 0;
+    this.voiceInputLevel = 0;
+    this.micMuted = false;
+    this.micLabel = '麦克风';
+  },
+
+  startVoicePress(event) {
+    var self = this;
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    if (this.subPage !== 'voice' || this.voiceState === 'thinking' || this.voiceCaptureStarting) {
+      return;
+    }
+    if (this.voiceActive && this.voiceState === 'listening') {
+      return;
+    }
+    this.clearVoiceTimers();
+    this.stopVoiceResources();
+    this.voiceTouchStartY = this.readTouchY(event);
+    this.voiceTouchStartX = this.readTouchX(event);
+    this.voicePressActive = true;
+    this.voiceEndArmed = false;
+    this.voiceCta = '松开发送';
     this.voiceActive = true;
     this.voiceState = 'listening';
     this.voiceStatus = '正在请求麦克风权限';
@@ -447,6 +493,118 @@ export default {
     this.requestMicrophoneAndStart();
   },
 
+  readTouchY(event) {
+    var touches = event && event.touches && event.touches.length ? event.touches : null;
+    if (!touches && event && event.changedTouches && event.changedTouches.length) {
+      touches = event.changedTouches;
+    }
+    var point = touches && touches.length ? touches[0] : event;
+    if (!point) {
+      return null;
+    }
+    if (typeof point.globalY === 'number') {
+      return point.globalY;
+    }
+    if (typeof point.clientY === 'number') {
+      return point.clientY;
+    }
+    if (typeof point.screenY === 'number') {
+      return point.screenY;
+    }
+    return typeof point.y === 'number' ? point.y : null;
+  },
+
+  readTouchX(event) {
+    var touches = event && event.touches && event.touches.length ? event.touches : null;
+    if (!touches && event && event.changedTouches && event.changedTouches.length) {
+      touches = event.changedTouches;
+    }
+    var point = touches && touches.length ? touches[0] : event;
+    if (!point) {
+      return null;
+    }
+    if (typeof point.globalX === 'number') {
+      return point.globalX;
+    }
+    if (typeof point.clientX === 'number') {
+      return point.clientX;
+    }
+    if (typeof point.screenX === 'number') {
+      return point.screenX;
+    }
+    return typeof point.x === 'number' ? point.x : null;
+  },
+
+  onVoiceTouchMove(event) {
+    if (!this.voicePressActive || !this.voiceActive || this.voiceState !== 'listening') {
+      return;
+    }
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    var currentY = this.readTouchY(event);
+    if (this.voiceTouchStartY === null || currentY === null) {
+      return;
+    }
+    var upward = this.voiceTouchStartY - currentY;
+    var currentX = this.readTouchX(event);
+    if (this.voiceTouchStartX !== null && currentX !== null) {
+      var horizontal = currentX - this.voiceTouchStartX;
+      if (Math.abs(horizontal) >= VOICE_CANCEL_SLIDE_X_PX &&
+        Math.abs(horizontal) > Math.abs(upward) * 1.2) {
+        this.cancelVoicePress();
+        if (horizontal < 0) {
+          this.closeSubPage();
+        }
+        return;
+      }
+    }
+    if (upward >= VOICE_END_SLIDE_PX) {
+      this.voiceEndArmed = true;
+      this.voiceStatus = '已上滑 · 松开结束';
+    }
+  },
+
+  onVoiceTouchEnd(event) {
+    if (!this.voicePressActive) {
+      return;
+    }
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
+    if (this.voiceActive && this.voiceState === 'listening') {
+      this.submitVoiceTurn();
+    }
+  },
+
+  onVoiceTouchCancel(event) {
+    if (event && event.stopPropagation) {
+      event.stopPropagation();
+    }
+    if (!this.voicePressActive) {
+      return;
+    }
+    this.cancelVoicePress();
+    this.showToast('本次语音未发送');
+  },
+
+  cancelVoicePress() {
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
+    this.stopVoiceResources();
+    this.clearVoiceTimers();
+    this.voiceActive = false;
+    this.voiceState = 'idle';
+    this.voiceEndArmed = false;
+    this.voiceCta = '按住说话';
+    this.voiceStatus = '按住说话 · 上滑结束';
+    this.voiceInputLevel = 0;
+  },
+
   requestMicrophoneAndStart() {
     var self = this;
     this.voiceCaptureStarting = true;
@@ -463,6 +621,9 @@ export default {
           self.voiceState = 'error';
           self.voiceStatus = '未获得麦克风权限';
           self.voiceResponseText = '请允许麦克风权限后重试';
+          self.voicePressActive = false;
+          self.voiceEndArmed = false;
+          self.voiceCta = '按住重试';
           self.showToast('未获得麦克风权限');
           return;
         }
@@ -472,6 +633,9 @@ export default {
         self.voiceState = 'error';
         self.voiceStatus = '麦克风权限请求失败';
         self.voiceResponseText = '无法请求系统权限';
+        self.voicePressActive = false;
+        self.voiceEndArmed = false;
+        self.voiceCta = '按住重试';
         self.showToast('麦克风权限请求失败');
       });
     } catch (error) {
@@ -479,6 +643,9 @@ export default {
       this.voiceState = 'error';
       this.voiceStatus = '麦克风权限不可用';
       this.voiceResponseText = '当前系统未提供录音权限接口';
+      this.voicePressActive = false;
+      this.voiceEndArmed = false;
+      this.voiceCta = '按住重试';
       this.showToast('麦克风权限接口不可用');
     }
   },
@@ -508,7 +675,7 @@ export default {
       }
       self.voiceCaptureActive = true;
       self.voiceState = 'listening';
-      self.voiceStatus = '正在聆听 · 麦克风已连接';
+      self.voiceStatus = '正在聆听 · 松开发送 · 上滑结束';
       self.captureAudioChunk();
       self.armVoiceMaxDuration();
     }).catch(function (error) {
@@ -516,6 +683,9 @@ export default {
       self.voiceState = 'error';
       self.voiceStatus = '麦克风启动失败';
       self.voiceResponseText = '无法打开真实麦克风';
+      self.voicePressActive = false;
+      self.voiceEndArmed = false;
+      self.voiceCta = '按住重试';
       self.showToast('麦克风启动失败');
     });
   },
@@ -541,7 +711,9 @@ export default {
       self.voicePcmChunks.push(buffer);
       self.voiceCapturedBytes += buffer.byteLength;
       self.voiceInputLevel = self.computePcmLevel(buffer);
-      self.voiceStatus = '正在聆听 · 输入 ' + self.voiceInputLevel + '%';
+      if (!self.voiceEndArmed) {
+        self.voiceStatus = '正在聆听 · 输入 ' + self.voiceInputLevel + '% · 上滑结束';
+      }
       if (self.voiceCapturedBytes >= VOICE_SAMPLE_RATE * 2 * VOICE_MAX_SECONDS) {
         self.submitVoiceTurn();
         return;
@@ -552,6 +724,9 @@ export default {
         self.voiceState = 'error';
         self.voiceStatus = '麦克风读取失败';
         self.voiceResponseText = '请重新开始语音对话';
+        self.voicePressActive = false;
+        self.voiceEndArmed = false;
+        self.voiceCta = '按住重试';
       }
     });
   },
@@ -614,9 +789,53 @@ export default {
     return result.buffer;
   },
 
+  encodeBase64Chunk(bytes, start, end) {
+    var chars = [];
+    for (var i = start; i < end; i += 3) {
+      var remaining = end - i;
+      var b0 = bytes[i];
+      var b1 = remaining > 1 ? bytes[i + 1] : 0;
+      var b2 = remaining > 2 ? bytes[i + 2] : 0;
+      chars.push(BASE64_ALPHABET.charAt(b0 >> 2));
+      chars.push(BASE64_ALPHABET.charAt(((b0 & 3) << 4) | (b1 >> 4)));
+      chars.push(remaining > 1 ?
+        BASE64_ALPHABET.charAt(((b1 & 15) << 2) | (b2 >> 6)) : '=');
+      chars.push(remaining > 2 ? BASE64_ALPHABET.charAt(b2 & 63) : '=');
+    }
+    return chars.join('');
+  },
+
+  encodePcmBase64(pcm) {
+    var self = this;
+    var bytes = pcm instanceof Uint8Array ? pcm : new Uint8Array(pcm);
+    return new Promise(function (resolve, reject) {
+      if (!bytes.length) {
+        resolve('');
+        return;
+      }
+      var parts = [];
+      var offset = 0;
+      function encodeNextChunk() {
+        try {
+          if (offset >= bytes.length) {
+            resolve(parts.join(''));
+            return;
+          }
+          var end = Math.min(bytes.length, offset + BASE64_CHUNK_BYTES);
+          parts.push(self.encodeBase64Chunk(bytes, offset, end));
+          offset = end;
+          setTimeout(encodeNextChunk, 0);
+        } catch (error) {
+          reject(error);
+        }
+      }
+      encodeNextChunk();
+    });
+  },
+
   simulateVoiceTurn() {
     if (!this.voiceActive) {
-      this.startVoice();
+      this.startVoicePress(null);
       return;
     }
     if (this.micMuted) {
@@ -632,9 +851,23 @@ export default {
       return;
     }
     if (this.voiceCapturedBytes < 6400) {
+      this.stopMicCapture();
+      this.clearVoiceTimers();
+      this.voiceActive = false;
+      this.voiceState = 'idle';
+      this.voiceStatus = '按住说话 · 上滑结束';
+      this.voiceCta = '按住说话';
+      this.voiceEndArmed = false;
+      this.voicePressActive = false;
+      this.voiceInputLevel = 0;
       this.showToast('说话时间太短，请再说一次');
       return;
     }
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
+    this.voiceEndArmed = false;
+    this.voiceCta = '正在处理';
     var pcm = this.concatPcmChunks();
     this.stopMicCapture();
     this.voiceState = 'thinking';
@@ -649,6 +882,7 @@ export default {
         self.voiceState = 'error';
         self.voiceStatus = 'Codex 后端不可用';
         self.voiceResponseText = self.describeNetworkError(error);
+        self.voiceCta = '按住重试';
         self.serviceStatus = '连接失败';
         self.showToast('Codex 后端不可用');
       });
@@ -656,18 +890,13 @@ export default {
     }
     this.voiceStatus = '正在识别真实语音';
     var base = this.getServiceUrl('');
-    var voiceBody = {
-      pcmBase64: this.encodePcmBase64(pcm),
-      sampleRate: VOICE_SAMPLE_RATE,
-      model: this.apiModel || LOCAL_MODEL
-    };
     this.networkRequest(base + '/api/voice', {
       method: 'POST',
       header: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/octet-stream',
         'X-Nova-Model': this.apiModel || LOCAL_MODEL
       },
-      extraData: voiceBody,
+      extraData: pcm,
       connectTimeout: 60000,
       readTimeout: 180000
     }).then(function (result) {
@@ -702,6 +931,7 @@ export default {
       self.voiceState = 'error';
       self.voiceStatus = '真实服务请求失败';
       self.voiceResponseText = self.describeNetworkError(error);
+      self.voiceCta = '按住重试';
       self.showToast('真实语音请求失败');
     });
   },
@@ -727,7 +957,12 @@ export default {
     this.stopVoiceResources();
     this.voiceActive = false;
     this.voiceState = 'idle';
-    this.voiceStatus = '正在聆听';
+    this.voiceStatus = '按住说话 · 上滑结束';
+    this.voiceCta = '按住说话';
+    this.voiceEndArmed = false;
+    this.voicePressActive = false;
+    this.voiceTouchStartY = null;
+    this.voiceTouchStartX = null;
     this.voiceResponseText = '';
     this.voiceTranscriptText = '';
     this.voiceTimer = '00:00';
@@ -819,25 +1054,34 @@ export default {
         reject(error);
         return;
       }
-      var body = {
-        pcmBase64: self.encodePcmBase64(pcm),
-        sampleRate: VOICE_SAMPLE_RATE,
-        repoId: self.codexRepoId,
-        mode: 'readonly'
-      };
-      self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
-        method: http.RequestMethod.POST,
-        header: self.codexHeaders(),
-        extraData: body,
-        connectTimeout: 10000,
-        readTimeout: 60000
-      }).then(function (result) {
-        var payload = self.parseHttpResult(result.result);
-        if (!payload.taskId) {
-          throw new Error(payload.error || '任务创建失败');
+      if (self.voiceActive) {
+        self.voiceStatus = '正在准备语音';
+      }
+      self.encodePcmBase64(pcm).then(function (encoded) {
+        if (self.voiceActive) {
+          self.voiceStatus = '正在创建 Codex 任务';
         }
-        self.adoptCodexTask(payload, origin);
-        resolve(payload);
+        self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
+          method: http.RequestMethod.POST,
+          header: self.codexHeaders(),
+          extraData: {
+            pcmBase64: encoded,
+            sampleRate: VOICE_SAMPLE_RATE,
+            repoId: self.codexRepoId,
+            mode: 'readonly'
+          },
+          connectTimeout: 10000,
+          readTimeout: 60000
+        }).then(function (result) {
+          var payload = self.parseHttpResult(result.result);
+          if (!payload.taskId) {
+            throw new Error(payload.error || '任务创建失败');
+          }
+          self.adoptCodexTask(payload, origin);
+          resolve(payload);
+        }).catch(function (error) {
+          reject(error);
+        });
       }).catch(function (error) {
         reject(error);
       });
@@ -1135,31 +1379,6 @@ export default {
     this.subPage = '';
     this.pageIndex = 1;
     this.startRecording();
-  },
-
-  encodePcmBase64(buffer) {
-    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    var bytes = new Uint8Array(buffer);
-    var parts = [];
-    var chunkSize = 3 * 4096;
-    for (var start = 0; start < bytes.length; start += chunkSize) {
-      var end = Math.min(start + chunkSize, bytes.length);
-      var chunk = bytes.subarray(start, end);
-      var output = '';
-      for (var i = 0; i < chunk.length; i += 3) {
-        var a = chunk[i];
-        var hasB = i + 1 < chunk.length;
-        var hasC = i + 2 < chunk.length;
-        var b = hasB ? chunk[i + 1] : 0;
-        var c = hasC ? chunk[i + 2] : 0;
-        output += chars.charAt(a >> 2);
-        output += chars.charAt(((a & 3) << 4) | (b >> 4));
-        output += hasB ? chars.charAt(((b & 15) << 2) | (c >> 6)) : '=';
-        output += hasC ? chars.charAt(c & 63) : '=';
-      }
-      parts.push(output);
-    }
-    return parts.join('');
   },
 
   networkRequest(url, options) {

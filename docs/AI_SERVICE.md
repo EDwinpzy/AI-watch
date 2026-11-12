@@ -191,22 +191,26 @@ python scripts/test_codex_bridge.py --long
 python scripts\test_release_e2e.py `
   --base-url http://192.168.1.129:8787 `
   --token <token> `
-  --voice-pcm artifacts\release-v1.2.0\e2e\voice-input-16k.pcm
+  --voice-pcm artifacts\release-v1.2.1\e2e\voice-input-16k.pcm
 ```
 
 覆盖健康检查、鉴权、文字任务、超过 60 秒仍可轮询、并发 `409`、
 取消、真实 PCM 语音识别和静音返回。脚本默认写入
-`artifacts/release-v1.2.0/e2e/release-e2e.json`。
+`artifacts/release-v1.2.1/e2e/release-e2e.json`。
 
-2026-11-12 的本机验证结果：
+2026-11-12 的 v1.2.1 本机验证结果：
 
 ```text
-文字任务：121.77 秒，超过 60 秒仍可查询
+真实只读读取：20.76 秒，正确读取仓库内容
+六文档长任务：76.29 秒，超过 60 秒仍可查询
+8787 设备服务真实只读任务：99.58 秒
+统一 E2E 文字任务：76.67 秒，超过 60 秒仍可查询
 并发保护：409
 取消：cancelled，2.23 秒停止，子进程已退出
-语音创建：2.72 秒
-识别：检查当前仓库,默认语音后端是什么?用一句话回答。
+统一 E2E 语音创建：2.08 秒
+识别：请用一句话介绍人工智能。
 返回：audioUrl 为空，无 TTS 音频文件
+最新统一 E2E：文字任务 139.77 秒，语音创建 0.59 秒
 ```
 
-该记录证明当前本机服务和 Magpie 链路，不替代真机麦克风与网络验收。
+真机随后完成 60 秒录音、长轮询、结果页、401、离线后端和模式切换验收。

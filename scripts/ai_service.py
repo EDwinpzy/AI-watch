@@ -126,7 +126,7 @@ class Runtime:
         text = (result.get("text") or "").strip()
         self.log(event="asr_done", requestId=request_id, audioBytes=len(pcm),
                  wavBytes=wav_path.stat().st_size, elapsedMs=elapsed_ms,
-                 transcript=text, wavPath=str(wav_path.relative_to(ROOT)))
+                 transcriptChars=len(text), wavPath=str(wav_path.relative_to(ROOT)))
         return {"requestId": request_id, "transcript": text, "elapsedMs": elapsed_ms,
                 "wavPath": str(wav_path.relative_to(ROOT))}
 
@@ -145,8 +145,9 @@ class Runtime:
             payload = json.loads(response.read().decode("utf-8"))
         reply = (payload.get("response") or "").strip()
         elapsed_ms = round((time.perf_counter() - started) * 1000)
-        self.log(event="model_done", model=payload.get("model", model), prompt=prompt,
-                 reply=reply, elapsedMs=elapsed_ms, done=payload.get("done"))
+        self.log(event="model_done", model=payload.get("model", model),
+                 promptChars=len(prompt), replyChars=len(reply),
+                 elapsedMs=elapsed_ms, done=payload.get("done"))
         return {"model": payload.get("model", model), "reply": reply,
                 "elapsedMs": elapsed_ms, "done": bool(payload.get("done"))}
 
@@ -175,7 +176,7 @@ class Runtime:
             raise RuntimeError(f"TTS failed: {proc.stderr or proc.stdout}")
         text_path.unlink(missing_ok=True)
         elapsed_ms = round((time.perf_counter() - started) * 1000)
-        self.log(event="tts_done", text=text, elapsedMs=elapsed_ms,
+        self.log(event="tts_done", textChars=len(text), elapsedMs=elapsed_ms,
                  wavBytes=wav_path.stat().st_size, wavPath=str(wav_path.relative_to(ROOT)))
         return wav_path
 
@@ -300,7 +301,8 @@ class Handler(BaseHTTPRequestHandler):
                 tts = self.runtime.synthesize(chat["reply"])
                 total_ms = round((time.perf_counter() - pipeline_started) * 1000)
                 self.runtime.log(event="voice_pipeline_done", requestId=asr["requestId"],
-                                 totalMs=total_ms, transcript=asr["transcript"], reply=chat["reply"])
+                                 totalMs=total_ms, transcriptChars=len(asr["transcript"]),
+                                 replyChars=len(chat["reply"]))
                 self._send_json(HTTPStatus.OK, {"ok": True,
                     "transcript": asr["transcript"], "reply": chat["reply"],
                     "model": chat["model"], "audioUrl": f"/api/audio/{tts.name}",
@@ -312,25 +314,36 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json(HTTPStatus.UNAUTHORIZED, {"ok": False, "error": "codex auth failed"})
                     return
                 if self.path == "/api/codex/voice":
-                    payload = json.loads(body.decode("utf-8"))
-                    encoded = str(payload.get("pcmBase64") or "")
-                    if not encoded:
-                        raise ValueError("pcmBase64 is required")
-                    try:
-                        pcm = base64.b64decode(encoded, validate=True)
-                    except (binascii.Error, ValueError) as exc:
-                        raise ValueError("pcmBase64 is invalid") from exc
+                    sample_rate = 16000
+                    repo_id = "watch"
+                    mode = "readonly"
+                    if "application/json" in (self.headers.get("Content-Type") or ""):
+                        payload = json.loads(body.decode("utf-8"))
+                        encoded = str(payload.get("pcmBase64") or "")
+                        if not encoded:
+                            raise ValueError("pcmBase64 is required")
+                        try:
+                            pcm = base64.b64decode(encoded, validate=True)
+                        except (binascii.Error, ValueError) as exc:
+                            raise ValueError("pcmBase64 is invalid") from exc
+                        sample_rate = int(payload.get("sampleRate") or sample_rate)
+                        repo_id = str(payload.get("repoId") or repo_id)
+                        mode = str(payload.get("mode") or mode)
+                    else:
+                        pcm = body
+                        sample_rate = int(self.headers.get("X-Nova-Sample-Rate") or sample_rate)
+                        repo_id = str(self.headers.get("X-Nova-Repo-Id") or repo_id)
+                        mode = str(self.headers.get("X-Nova-Mode") or mode)
                     if not pcm:
                         raise ValueError("PCM body is required")
-                    sample_rate = int(payload.get("sampleRate") or 16000)
                     if sample_rate != 16000:
                         raise ValueError("sampleRate must be 16000")
                     transcript = self.runtime.transcribe(pcm)["transcript"]
                     task = self.runtime.codex.create(
                         prompt=transcript,
                         transcript=transcript,
-                        repo_id=str(payload.get("repoId") or "watch"),
-                        mode=str(payload.get("mode") or "readonly"),
+                        repo_id=repo_id,
+                        mode=mode,
                     )
                     self._send_json(HTTPStatus.OK, {
                         "ok": True,
@@ -342,6 +355,8 @@ class Handler(BaseHTTPRequestHandler):
                 if self.path == "/api/codex/task":
                     payload = json.loads(body.decode("utf-8"))
                     prompt = str(payload.get("prompt") or "").strip()
+                    if not prompt:
+                        raise ValueError("prompt is required")
                     task = self.runtime.codex.create(
                         prompt=prompt,
                         transcript=str(payload.get("transcript") or prompt).strip(),

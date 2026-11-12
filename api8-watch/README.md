@@ -6,7 +6,7 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 
 - 原生 ArkUI HML/CSS/JS，不使用 WebView。
 - `deviceType: ["wearable"]`，target/compatible API 8。
-- 版本 `1.2.0 / versionCode 3`，包名 `com.aiwatch.watch`。
+- 版本 `1.2.1 / versionCode 4`，包名 `com.aiwatch.watch`。
 - 4 个主页面：首页、录音摘要、最近任务、设置。
 - 7 个子页面：语音、回答、任务、结果、文字聊天、服务配置、字段编辑。
 - 默认语音后端为 `codex`，同时保留 Ollama 即时链路。
@@ -41,6 +41,10 @@ HUAWEI WATCH 4 `ARC-AL00`（HarmonyOS 3.0 / API 8）正式设备工程。
 使用 API 8 SDK、Node 14 和工程内 Hvigor：
 
 ```powershell
+$signing='signing\build-profile.signing.json5'
+powershell -ExecutionPolicy Bypass -File scripts\setup-local-build.ps1 `
+  -SigningConfigPath $signing
+
 $sdkBase='C:\Users\63054\AppData\Local\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local'
 $env:OHOS_BASE_SDK_HOME="$sdkBase\OpenHarmony\Sdk"
 $env:HWSDK="$sdkBase\Huawei\Sdk"
@@ -80,15 +84,18 @@ npm run check:core
 npm run check:api8
 ```
 
-API 8 检查当前为 83 项，包含：
+API 8 检查当前为 111 项，包含：
 
 - 无媒体播放导入、无播放路径、无 WAV。
 - 无可见返回/关闭按钮，使用左滑逐级返回、主页面上下切页。
 - 默认 Codex、1.5 秒轮询、离页停止轮询、取消接口和令牌头。
 - JSON 请求使用 `@ohos.net.http`，创建任务使用 `200` 并拒绝非 2xx。
+- 长录音 PCM 使用可让出 JS 线程的分块 Base64 编码，避免 60 秒录音提交时卡死。
 - 设置页固定静音文案和聊天/录音任务状态。
 
 候选 HAP 与签名材料只保存在本机 `signing/`，不纳入 Git。
+`build-profile.json5` 也由 `build-profile.example.json5` 生成为本机忽略文件；
+不要把签名路径或口令写回仓库模板。
 
 发布候选构建：
 
@@ -100,9 +107,25 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
 原型语法检查，再做 release 干净构建、HAP 内音频/GIF 检查与
 `hapsigntoolv2` 签名校验。产物和 SHA-256 写入本机 `signing/`。
 
-## 静音构建校验
+## v1.2.1 发布候选构建
 
-2026-11-12 的本机静音构建：
+2026-11-12 从干净提交 `d6117ba` 使用 Node 14 生成并通过签名校验：
+
+```text
+文件：signing/NOVA-Watch-AI-fa-api8-v1.2.1-release.hap
+大小：1,201,796 bytes
+SHA-256：25B09E4423E9009B952AF9B1ECF2607FF32B7A7FD142F69A3103B39B4D1F73D9
+签名：hapsigntoolv2 verify success
+包内容：44 entries；WAV / MP3 / OGG / AAC / M4A / GIF 均为 0
+```
+
+该候选包已安装到 HUAWEI WATCH 4，真机完成 60 秒录音自动结束、异步任务创建、
+超过 60 秒的轮询、结果与转写页、复制、继续追问、任务历史、401、并发冲突、
+取消、后端离线提示、Ollama/Codex 模式切换和手势返回验收；手表全程静音。
+
+## 静音构建校验（v1.2.0 历史记录）
+
+2026-11-12 的 v1.2.0 历史静音构建（保留追溯）：
 
 ```text
 文件：signing/NOVA-Watch-AI-fa-api8-codex-silent-v1.2.0.hap
@@ -112,6 +135,6 @@ SHA-256：72060AC3B444043C883903D0EBEAC5A2D74A0678A1D8121820E58DC51A10C48F
 包内容：44 entries；WAV / MP3 / OGG / AAC / M4A / GIF 均为 0
 ```
 
-该记录只证明本机候选包和当前源码。当前 `build-profile.json5` 使用本机可安装
-签名证书，不等同于 AppGallery 正式发布证书；上架前必须替换为正式证书并重新
-执行完整门禁。
+该记录只证明本机候选包和当前源码。本机生成的 `build-profile.json5` 使用
+可安装调试签名证书，不等同于 AppGallery 正式发布证书；上架前必须替换为
+正式证书并重新执行完整门禁。

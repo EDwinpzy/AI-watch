@@ -174,6 +174,16 @@ class CodexRunner:
             "-",
         ]
 
+    @staticmethod
+    def _child_environment() -> dict[str, str]:
+        environment = os.environ.copy()
+        # The desktop app marks its own child processes as registered Core
+        # launches. A nested codex exec cannot reuse that sandbox registration
+        # and fails every command with "requires an installed app".
+        environment.pop("CODEX_WINDOWS_REGISTERED_CORE", None)
+        environment.pop("CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY", None)
+        return environment
+
     def _spawn(self, args: list[str]) -> subprocess.Popen:
         options = {
             "stdin": subprocess.PIPE,
@@ -183,6 +193,7 @@ class CodexRunner:
             "encoding": "utf-8",
             "errors": "replace",
             "bufsize": 1,
+            "env": self._child_environment(),
         }
         if os.name == "nt":
             options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
