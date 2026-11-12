@@ -259,7 +259,13 @@ assert.ok(
   exists('scripts/prepare-built-in-config.ps1') &&
   read('scripts/prepare-built-in-config.ps1').includes('HiWearMainAbility') &&
   read('scripts/prepare-built-in-config.ps1').includes('codexBaseUrl') &&
-  read('scripts/prepare-built-in-config.ps1').includes('codexToken'),
+  read('scripts/prepare-built-in-config.ps1').includes('codexToken') &&
+  read('scripts/build-release.ps1').includes(
+    'HiWearMainAbility\\built-in-config.js'
+  ) &&
+  !read('scripts/build-release.ps1').includes(
+    'pages\\round\\built-in-config.js'
+  ),
   'local built-in config generation is not protected'
 );
 
