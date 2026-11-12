@@ -1,6 +1,12 @@
 # 手表 API 接入
 
-正式手表入口：`api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.js`。
+正式手表包含两个页面：
+
+- `pages/index/index`：经典 Aurora 界面，接入 PC 本地 Whisper/Codex 服务。
+- `pages/round/index`：Apple Watch 圆环界面，接入内置 Magpie、STT.ai
+  和可选 TTS。
+
+两个页面通过 API 8 `@ohos.router` 双向切换。
 
 ## 网络层
 
@@ -76,7 +82,7 @@ POST /api/codex/task/{taskId}/cancel
 
 业务按钮显示“停止任务”，不是导航控件的返回/关闭按钮。
 
-## 静音约束
+## 经典页静音约束
 
 - 语音模式和文字模式都只显示 `finalText` / `speechText`。
 - `audioUrl` 不参与 UI 状态。
@@ -84,11 +90,25 @@ POST /api/codex/task/{taskId}/cancel
 - 不请求 `/api/audio/*.wav`。
 - 不导入媒体播放模块。
 
+以上约束适用于经典页。圆环页为兼容早期语音播报能力而保留媒体播放器，
+但自动播报默认关闭，必须由用户手动开启。
+
 ## 旧链路
 
 设置页仍可在 `Codex` 与 `Ollama` 间切换。Ollama 模式复用旧
 `POST /api/voice`；手表读取 `transcript` 和 `reply` 并显示为文字，
 忽略服务端兼容返回的音频地址。
+
+## 圆环页链路
+
+- 聊天：`POST https://magpie-relay.pengzhiyuan0724.workers.dev/v1/chat/completions`
+- STT：`wss://api.stt.ai/v1/stream`，16 kHz、单声道、S16LE PCM
+- TTS：`https://fanyi.baidu.com/gettts`，默认关闭
+
+Base URL、模型和 API Key 通过本地生成文件
+`pages/round/built-in-config.js` 注入。该文件由
+`scripts/prepare-built-in-config.ps1` 创建并被 Git 忽略；仓库只保存读取逻辑，
+不保存真实凭据。圆环页不显示服务地址或密钥编辑入口。
 
 ## 错误反馈
 

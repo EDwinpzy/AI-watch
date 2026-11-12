@@ -2,6 +2,7 @@ import pasteboard from '@ohos.pasteboard';
 import audio from '@ohos.multimedia.audio';
 import featureAbility from '@ohos.ability.featureAbility';
 import http from '@ohos.net.http';
+import router from '@ohos.router';
 
 function pad2(value) {
   return value < 10 ? '0' + value : '' + value;
@@ -1797,6 +1798,11 @@ export default {
 
   showSilentInfo() {
     this.showToast('手表不会播放 TTS');
+  },
+
+  openRoundInterface() {
+    this.stopVoiceResources();
+    router.push({ url: 'pages/round/index' });
   },
 
   restartRecording() {

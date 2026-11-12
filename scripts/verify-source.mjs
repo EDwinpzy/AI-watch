@@ -80,6 +80,16 @@ const api8Hml = read(
 const api8Css = read(
   'api8-watch/entry/src/main/js/HiWearMainAbility/pages/index/index.css'
 );
+const roundPageSource = read(
+  'api8-watch/entry/src/main/js/HiWearMainAbility/pages/round/index.js'
+);
+const roundHml = read(
+  'api8-watch/entry/src/main/js/HiWearMainAbility/pages/round/index.hml'
+);
+const roundCss = read(
+  'api8-watch/entry/src/main/js/HiWearMainAbility/pages/round/index.css'
+);
+const gitignore = read('.gitignore');
 const api8RootHvigorfile = read('api8-watch/hvigorfile.ts');
 const api8EntryHvigorfile = read('api8-watch/entry/hvigorfile.ts');
 
@@ -142,6 +152,55 @@ assert.ok(
   'API 8 service settings must not be logged'
 );
 
+assert.deepEqual(
+  api8Config.module.js[0].pages,
+  ['pages/index/index', 'pages/round/index'],
+  'both watch interfaces must be registered'
+);
+assert.ok(
+  api8PageSource.includes("from '@ohos.router'") &&
+  api8PageSource.includes("router.push({ url: 'pages/round/index' })"),
+  'classic interface must open the round interface'
+);
+assert.ok(
+  api8Hml.includes('@click="openRoundInterface"') &&
+  api8Hml.includes('Apple Watch 圆环'),
+  'classic settings must expose the interface switch'
+);
+assert.ok(
+  roundPageSource.includes("from '@ohos.router'") &&
+  roundPageSource.includes('router.back()') &&
+  roundPageSource.includes("from './built-in-config'"),
+  'round interface navigation or local config import is missing'
+);
+assert.ok(
+  roundHml.includes('@click="switchToClassicInterface"') &&
+  roundHml.includes('点击返回经典界面'),
+  'round settings must expose the classic interface switch'
+);
+assert.ok(
+  roundHml.includes('Apple Watch') &&
+  roundHml.includes('1.2.2') &&
+  roundCss.includes('.activity-ring'),
+  'round interface visual identity is incomplete'
+);
+assert.ok(
+  !roundHml.includes('openField(') &&
+  !roundHml.includes('API 密钥'),
+  'round interface must keep the service connection built in'
+);
+assert.ok(
+  !/\bsk-[A-Za-z0-9]{20,}\b/.test(roundPageSource),
+  'built-in credentials must never be tracked in the round page source'
+);
+assert.ok(
+  gitignore.includes(
+    'api8-watch/entry/src/main/js/HiWearMainAbility/pages/round/built-in-config.js'
+  ) &&
+  exists('scripts/prepare-built-in-config.ps1'),
+  'local built-in config generation is not protected'
+);
+
 assert.ok(
   indexSource.includes('apiKey: string') &&
   indexSource.includes('type(InputType.Password)'),
@@ -201,10 +260,14 @@ for (const functionName of [
   );
 }
 
+const verificationText = fs.readFileSync(new URL(import.meta.url)).toString();
+const verificationCount =
+  (verificationText.match(/\bassert\./g) || []).length;
+
 console.log(JSON.stringify({
   success: true,
   screens: requiredScreens.length,
   builders: requiredBuilders.length,
   rawfiles: rawfileRefs.length,
-  checks: 42
+  checks: verificationCount
 }, null, 2));

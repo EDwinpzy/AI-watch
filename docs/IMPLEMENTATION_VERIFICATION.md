@@ -6,6 +6,20 @@
 
 更新日期：2026-10-25
 
+## 2026-11-12 双界面集成候选
+
+- 基于 `main@22471bf` 保留经典 Aurora/Codex 页面，并新增独立圆环页面。
+- 经典页与圆环页通过 API 8 `@ohos.router` 双向切换。
+- 圆环页保留内置 Magpie、STT.ai 流式转写和默认关闭的 TTS。
+- 内置凭据只在本地生成的 `pages/round/built-in-config.js` 中注入，未进入 Git。
+- `check:source` 53 项、`check:core` 14 项通过。
+- `check:api8` 通过：经典页 111 项、圆环页 121 项。
+- API 8 `LegacyCompileJS`、`LegacyPackageHap` 通过；双页面和注入配置均已打包。
+- 未签名 HAP：1,772,339 bytes，SHA-256
+  `6C3C7A765EABB2B9D1EBAF55392DF3F48D453ABE3BEA427A190C0318B181845C`。
+- 新版双向切换尚未在签名 HAP 上做实机点击验证；不能把本次编译结果当作
+  真机路由验收。
+
 ## 当前结论
 
 原生 API 8 FA 候选已在 HUAWEI WATCH 4 `ARC-AL00` 上完成安装、权限授权、

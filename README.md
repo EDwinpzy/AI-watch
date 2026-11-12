@@ -1,20 +1,22 @@
 # NOVA Watch AI
 
-面向 HarmonyOS API 8 圆形手表的静音 AI 助手。正式设备入口是
-`api8-watch/`，PC 本地服务负责 Whisper 转写与只读 `codex exec` 任务，
-手表只显示文字，不播放 TTS、提示音或其他音频。
+面向 HarmonyOS API 8 圆形手表的双界面 AI 助手。正式设备入口是
+`api8-watch/`，保留经典 Aurora 界面和 Apple Watch 风格圆环界面。
+经典界面继续使用 PC 本地 Whisper/Codex 服务并固定静音；圆环界面保留
+内置 Magpie、流式 STT 和可选 TTS，TTS 默认关闭。
 
-当前版本：`1.2.1 / versionCode 4`。
+当前版本：`1.2.2 / versionCode 5`。
 
 ## 当前能力
 
 - 首页能量球与“开始对话 / 录音摘要”双入口。
+- 设置页可在经典 Aurora 与 Apple Watch 圆环界面之间双向切换。
 - 语音输入、录音、文字聊天、任务历史、服务配置和字段编辑。
 - Codex 语音任务：录音 → 本机转写 → 创建异步任务 → 1.5 秒轮询。
 - Whisper `small` 中文识别、简体中文提示词和启动预热。
 - 任务取消、超时、Magpie 不可用快速失败和进程树清理。
 - `X-Nova-Token` 鉴权、仓库白名单、单任务并发和只读沙箱。
-- 全程静音：手表不导入媒体播放模块，也不请求或下载 WAV。
+- 经典界面固定静音；圆环界面默认不播报，用户主动开启后才使用 TTS。
 
 已移除 VPN、图片生成、模型市场、推荐提问和旧粒子 GIF 等未使用能力。
 
@@ -75,6 +77,9 @@ python -m unittest -v scripts.test_codex_bridge
 node --check prototypes/aurora-watch/app.js
 ```
 
+`check:api8` 同时覆盖经典页和圆环页；当前为经典页 111 项、圆环页
+121 项断言。
+
 长轮询回归：
 
 ```powershell
@@ -100,6 +105,8 @@ release 构建、包内容静音检查和 HAP 签名校验。
 - Codex 路由要求 `X-Nova-Token` 或 Bearer Token。
 - 第一版仅 `read-only`，写模式必须使用独立 worktree。
 - HAP、签名材料、音频、任务日志和本地服务日志不纳入 Git。
+- 圆环界面的内置 Magpie 凭据只在本地生成
+  `pages/round/built-in-config.js` 后打进 HAP；该文件已忽略，严禁提交。
 - `api8-watch/build-profile.json5` 是忽略的本机文件，只保存生成后的签名配置；
   仓库仅跟踪无凭据模板，避免证书路径和口令再次入库。
 - 明文 HTTP 只用于可信局域网验证；公网部署必须增加 HTTPS、限流和密钥托管。
