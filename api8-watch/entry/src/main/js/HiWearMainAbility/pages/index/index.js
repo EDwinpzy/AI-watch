@@ -2,7 +2,6 @@ import pasteboard from '@ohos.pasteboard';
 import audio from '@ohos.multimedia.audio';
 import featureAbility from '@ohos.ability.featureAbility';
 import http from '@ohos.net.http';
-import util from '@ohos.util';
 
 function pad2(value) {
   return value < 10 ? '0' + value : '' + value;
@@ -845,18 +844,13 @@ export default {
     }
     this.voiceStatus = '正在识别真实语音';
     var base = this.getServiceUrl('');
-    var voiceBody = {
-      pcmBase64: this.encodePcmBase64(pcm),
-      sampleRate: VOICE_SAMPLE_RATE,
-      model: this.apiModel || LOCAL_MODEL
-    };
     this.networkRequest(base + '/api/voice', {
       method: 'POST',
       header: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/octet-stream',
         'X-Nova-Model': this.apiModel || LOCAL_MODEL
       },
-      extraData: voiceBody,
+      extraData: pcm,
       connectTimeout: 60000,
       readTimeout: 180000
     }).then(function (result) {
@@ -1014,20 +1008,17 @@ export default {
         reject(error);
         return;
       }
-      self.encodePcmBase64Async(pcm).then(function (encodedPcm) {
-        var body = {
-          pcmBase64: encodedPcm,
-          sampleRate: VOICE_SAMPLE_RATE,
-          repoId: self.codexRepoId,
-          mode: 'readonly'
-        };
-        return self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
-          method: http.RequestMethod.POST,
-          header: self.codexHeaders(),
-          extraData: body,
-          connectTimeout: 10000,
-          readTimeout: 60000
-        });
+      var headers = self.codexHeaders();
+      headers['Content-Type'] = 'application/octet-stream';
+      headers['X-Nova-Sample-Rate'] = String(VOICE_SAMPLE_RATE);
+      headers['X-Nova-Repo-Id'] = self.codexRepoId;
+      headers['X-Nova-Mode'] = 'readonly';
+      self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
+        method: http.RequestMethod.POST,
+        header: headers,
+        extraData: pcm,
+        connectTimeout: 10000,
+        readTimeout: 60000
       }).then(function (result) {
         var payload = self.parseHttpResult(result.result);
         if (!payload.taskId) {
@@ -1332,14 +1323,6 @@ export default {
     this.subPage = '';
     this.pageIndex = 1;
     this.startRecording();
-  },
-
-  encodePcmBase64(buffer) {
-    return new util.Base64().encodeToStringSync(new Uint8Array(buffer));
-  },
-
-  encodePcmBase64Async(buffer) {
-    return new util.Base64().encodeToString(new Uint8Array(buffer));
   },
 
   networkRequest(url, options) {

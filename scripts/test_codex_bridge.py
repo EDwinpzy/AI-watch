@@ -494,6 +494,25 @@ class HttpRouteTests(unittest.TestCase):
         self.assertEqual(polled["status"], "succeeded")
         self.assertEqual(polled["finalText"], "完成")
 
+    def test_codex_voice_accepts_raw_pcm(self) -> None:
+        request = urllib.request.Request(
+            self.base + "/api/codex/voice",
+            data=b"\x00\x00" * 64,
+            headers={
+                "Content-Type": "application/octet-stream",
+                "X-Nova-Token": "secret-token",
+                "X-Nova-Sample-Rate": "16000",
+                "X-Nova-Repo-Id": "watch",
+                "X-Nova-Mode": "readonly",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        self.assertEqual(response.status, 200)
+        self.assertEqual(payload["transcript"], "检查仓库结构")
+        self.assertEqual(payload["status"], "queued")
+
     def test_health_reports_codex(self) -> None:
         status, payload = self.request("/health")
         self.assertEqual(status, 200)
