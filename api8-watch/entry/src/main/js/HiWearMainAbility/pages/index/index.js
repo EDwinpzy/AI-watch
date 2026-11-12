@@ -17,11 +17,13 @@ function copyMessages(messages) {
 
 var VOICE_SAMPLE_RATE = 16000;
 var VOICE_CHUNK_BYTES = 6400;
+var BASE64_CHUNK_BYTES = 6144;
 var VOICE_MAX_SECONDS = 15;
 var VOICE_END_SLIDE_PX = 28;
 var VOICE_CANCEL_SLIDE_X_PX = 32;
 var RECORD_MAX_SECONDS = 60;
 var CODEX_POLL_MS = 1500;
+var BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 var LOCAL_SERVICE_URL = 'http://192.168.1.129:8787';
 var LOCAL_MODEL = 'translategemma:4b';
 var WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -787,6 +789,50 @@ export default {
     return result.buffer;
   },
 
+  encodeBase64Chunk(bytes, start, end) {
+    var chars = [];
+    for (var i = start; i < end; i += 3) {
+      var remaining = end - i;
+      var b0 = bytes[i];
+      var b1 = remaining > 1 ? bytes[i + 1] : 0;
+      var b2 = remaining > 2 ? bytes[i + 2] : 0;
+      chars.push(BASE64_ALPHABET.charAt(b0 >> 2));
+      chars.push(BASE64_ALPHABET.charAt(((b0 & 3) << 4) | (b1 >> 4)));
+      chars.push(remaining > 1 ?
+        BASE64_ALPHABET.charAt(((b1 & 15) << 2) | (b2 >> 6)) : '=');
+      chars.push(remaining > 2 ? BASE64_ALPHABET.charAt(b2 & 63) : '=');
+    }
+    return chars.join('');
+  },
+
+  encodePcmBase64(pcm) {
+    var self = this;
+    var bytes = pcm instanceof Uint8Array ? pcm : new Uint8Array(pcm);
+    return new Promise(function (resolve, reject) {
+      if (!bytes.length) {
+        resolve('');
+        return;
+      }
+      var parts = [];
+      var offset = 0;
+      function encodeNextChunk() {
+        try {
+          if (offset >= bytes.length) {
+            resolve(parts.join(''));
+            return;
+          }
+          var end = Math.min(bytes.length, offset + BASE64_CHUNK_BYTES);
+          parts.push(self.encodeBase64Chunk(bytes, offset, end));
+          offset = end;
+          setTimeout(encodeNextChunk, 0);
+        } catch (error) {
+          reject(error);
+        }
+      }
+      encodeNextChunk();
+    });
+  },
+
   simulateVoiceTurn() {
     if (!this.voiceActive) {
       this.startVoicePress(null);
@@ -1008,24 +1054,34 @@ export default {
         reject(error);
         return;
       }
-      var headers = self.codexHeaders();
-      headers['Content-Type'] = 'application/octet-stream';
-      headers['X-Nova-Sample-Rate'] = String(VOICE_SAMPLE_RATE);
-      headers['X-Nova-Repo-Id'] = self.codexRepoId;
-      headers['X-Nova-Mode'] = 'readonly';
-      self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
-        method: http.RequestMethod.POST,
-        header: headers,
-        extraData: pcm,
-        connectTimeout: 10000,
-        readTimeout: 60000
-      }).then(function (result) {
-        var payload = self.parseHttpResult(result.result);
-        if (!payload.taskId) {
-          throw new Error(payload.error || '任务创建失败');
+      if (self.voiceActive) {
+        self.voiceStatus = '正在准备语音';
+      }
+      self.encodePcmBase64(pcm).then(function (encoded) {
+        if (self.voiceActive) {
+          self.voiceStatus = '正在创建 Codex 任务';
         }
-        self.adoptCodexTask(payload, origin);
-        resolve(payload);
+        self.networkRequest(self.getServiceUrl('/api/codex/voice'), {
+          method: http.RequestMethod.POST,
+          header: self.codexHeaders(),
+          extraData: {
+            pcmBase64: encoded,
+            sampleRate: VOICE_SAMPLE_RATE,
+            repoId: self.codexRepoId,
+            mode: 'readonly'
+          },
+          connectTimeout: 10000,
+          readTimeout: 60000
+        }).then(function (result) {
+          var payload = self.parseHttpResult(result.result);
+          if (!payload.taskId) {
+            throw new Error(payload.error || '任务创建失败');
+          }
+          self.adoptCodexTask(payload, origin);
+          resolve(payload);
+        }).catch(function (error) {
+          reject(error);
+        });
       }).catch(function (error) {
         reject(error);
       });

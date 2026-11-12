@@ -230,6 +230,21 @@ assert.equal(gesturePage.voiceCta, '按住说话');
 const pcm = new Int16Array([0, 16384, -16384]);
 assert.ok(page.computePcmLevel(pcm.buffer) > 20);
 
+const encoderBytes = new Uint8Array(13000);
+for (let i = 0; i < encoderBytes.length; i++) {
+  encoderBytes[i] = (i * 37 + 11) & 0xff;
+}
+let encoderYields = 0;
+const sandboxSetTimeout = sandbox.setTimeout;
+sandbox.setTimeout = function (callback, delay) {
+  encoderYields++;
+  return sandboxSetTimeout(callback, delay);
+};
+const encodedPcm = await page.encodePcmBase64(encoderBytes.buffer);
+sandbox.setTimeout = sandboxSetTimeout;
+assert.equal(encodedPcm, Buffer.from(encoderBytes).toString('base64'));
+assert.ok(encoderYields >= 3, 'large PCM encoding must yield between base64 chunks');
+
 const fetchResult = await page.networkRequest('http://example.test/health', { method: 'GET' });
 assert.equal(fetchResult.responseCode, 200);
 assert.equal(page.parseHttpResult(fetchResult.result).ok, true);
@@ -296,11 +311,11 @@ await page.submitCodexVoice(new ArrayBuffer(6400), 'voice');
 assert.equal(createRequest.url, 'http://192.168.1.129:8787/api/codex/voice');
 assert.equal(createRequest.options.method, 'POST');
 assert.equal(createRequest.options.header['X-Nova-Token'], 'test-token');
-assert.equal(createRequest.options.header['Content-Type'], 'application/octet-stream');
-assert.equal(createRequest.options.header['X-Nova-Mode'], 'readonly');
-assert.equal(createRequest.options.header['X-Nova-Repo-Id'], 'watch');
-assert.equal(createRequest.options.header['X-Nova-Sample-Rate'], '16000');
-assert.equal(createRequest.options.extraData.byteLength, 6400);
+assert.equal(createRequest.options.header['Content-Type'], 'application/json');
+assert.equal(createRequest.options.extraData.sampleRate, 16000);
+assert.equal(createRequest.options.extraData.repoId, 'watch');
+assert.equal(createRequest.options.extraData.mode, 'readonly');
+assert.equal(Buffer.from(createRequest.options.extraData.pcmBase64, 'base64').length, 6400);
 assert.equal(page.codexTaskId, 'task-voice-1');
 assert.equal(page.codexOrigin, 'voice');
 assert.equal(page.subPage, 'task');
