@@ -16,7 +16,7 @@ $apiRoot = Join-Path $root 'api8-watch'
 $appConfig = Join-Path $apiRoot 'AppScope\app.json5'
 $moduleConfig = Join-Path $apiRoot 'entry\src\main\config.json'
 $localBuildProfile = Join-Path $apiRoot 'build-profile.json5'
-$builtInRoundConfig = Join-Path $apiRoot 'entry\src\main\js\HiWearMainAbility\pages\round\built-in-config.js'
+$builtInConfig = Join-Path $apiRoot 'entry\src\main\js\HiWearMainAbility\built-in-config.js'
 $hvigor = Join-Path $apiRoot 'node_modules\@ohos\hvigor\bin\hvigor.js'
 $sourceHap = Join-Path $apiRoot 'entry\build\default\outputs\default\entry-default-signed.hap'
 if (-not $Version) {
@@ -38,8 +38,8 @@ if (-not $OutputDir) {
 if (-not (Test-Path -LiteralPath $hvigor)) {
   throw "Hvigor not found: $hvigor"
 }
-if (-not (Test-Path -LiteralPath $builtInRoundConfig)) {
-  throw 'Round built-in config is missing. Run scripts\prepare-built-in-config.ps1 with a local secret first.'
+if (-not (Test-Path -LiteralPath $builtInConfig)) {
+  throw 'Built-in config is missing. Run scripts\prepare-built-in-config.ps1 with a local secret first.'
 }
 if (-not (Test-Path -LiteralPath $localBuildProfile)) {
   if (-not $SigningConfigPath) {
