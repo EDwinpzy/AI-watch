@@ -18,10 +18,6 @@
       </div>
 
       <div class="home-actions">
-        <div class="home-action action-chat" @click="openQuickChat">
-          <image class="home-action-icon" src="/common/interface-icons/chat-white.png"></image>
-          <text class="home-action-label">文字对话</text>
-        </div>
         <div class="home-action action-record" @click="startRecordingFromHome">
           <image class="home-action-icon" src="/common/interface-icons/waveform-white.png"></image>
           <text class="home-action-label">录音摘要</text>
@@ -290,7 +286,7 @@
   </div>
 
   <div if="{{subPage === 'result'}}" class="subpage result-page">
-    <text class="fixed-page-title">摘要结果</text>
+    <text class="fixed-page-title">任务结果</text>
     <div class="segmented-control">
       <div class="segment-indicator {{resultTab === 'summary' ? 'segment-right' : 'segment-left'}}"></div>
       <div class="segment-option" @click="showTranscript">

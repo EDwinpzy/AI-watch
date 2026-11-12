@@ -80,6 +80,10 @@ assert.ok(!/vibrator|startVibration|playTts/.test(pageSource), 'the watch must n
 assert.ok(!/@click="(goBack|closeSubPage|closeChat)"/.test(hml), 'visible navigation buttons are forbidden');
 assert.equal((hml.match(/@swipe=/g) || []).length, 1, 'swipe handling must exist only on the root container');
 assert.match(hml, /@touchstart="onRootTouchStart"/, 'root touch start must snapshot list edges');
+assert.equal((hml.match(/class="page-dots"/g) || []).length, 4, 'every main page needs a page indicator');
+assert.equal((hml.match(/dot-active/g) || []).length, 4, 'each main page needs exactly one active dot');
+assert.ok(hml.includes('<text class="fixed-page-title">最近</text>'), 'history title must match the canonical menu name');
+assert.ok(!hml.includes('最近对话'), 'the legacy history title must not return');
 assert.match(hml, /id="recentList"/, 'recent list needs a stable id for scroll reset');
 assert.match(hml, /id="settingsList"/, 'settings list needs a stable id for scroll reset');
 assert.ok(
